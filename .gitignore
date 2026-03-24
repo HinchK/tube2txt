@@ -23,16 +23,17 @@ ENV/
 *.pem
 
 # Project Output & Media
-# (Ignore directories created for projects)
+projects/
+tube2txt.db
 OUTPUT/
 */images/
 */index.html
 */TUBE2TXT-OUTLINE.md
+*/TUBE2TXT-*.md
 */styles.css
 */video.*
-# Or more generally if you name projects consistently:
-# test-project/
-# my-video/
+clips/
+**/clips/
 
 # Specific downloaded formats
 *.mp4
