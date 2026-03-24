@@ -113,7 +113,7 @@ Transcript:
 {full_transcript}
 """
         response = self.client.models.generate_content(
-            model='models/gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=prompt
         )
         return response.text
@@ -233,7 +233,12 @@ def main():
 
     # Manual Clipping
     if args.clip and args.video_file:
-        start, end = args.clip.split('-')
+        # Parse timestamps: "HH:MM:SS-HH:MM:SS" or "HH:MM:SS.mmm-HH:MM:SS.mmm"
+        clip_match = re.match(r'^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)-(\d{2}:\d{2}:\d{2}(?:\.\d+)?)$', args.clip)
+        if not clip_match:
+            print(f"Error: Invalid clip range format '{args.clip}'. Expected HH:MM:SS-HH:MM:SS")
+            sys.exit(1)
+        start, end = clip_match.group(1), clip_match.group(2)
         output_name = f"clip_{start.replace(':','-')}_{end.replace(':','-')}.mp4"
         os.makedirs("clips", exist_ok=True)
         if ClippingEngine.extract_clip(args.video_file, start, end, os.path.join("clips", output_name)):

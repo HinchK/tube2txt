@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tube2txt"
-version = "2.0.0"
+version = "3.0.0"
 authors = [
   { name="Kasey Hinchman", email="kasey.hinchman@gmail.com" },
 ]
-description = "A hybrid Bash/Python tool to convert YouTube videos to structured web pages with AI outlines."
+description = "A hybrid Bash/Python tool to convert YouTube videos to structured web pages with AI outlines, a local hub dashboard, and smart clips."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -19,6 +19,8 @@ classifiers = [
 dependencies = [
     "google-genai",
     "python-dotenv",
+    "fastapi",
+    "uvicorn",
 ]
 
 [project.scripts]

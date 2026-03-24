@@ -3,9 +3,12 @@ import sqlite3
 import re
 from tube2txt import Database, VTTParser
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def migrate():
-    db = Database("tube2txt.db")
-    projects_dir = "projects"
+    db_path = os.environ.get("TUBE2TXT_DB", os.path.join(SCRIPT_DIR, "tube2txt.db"))
+    db = Database(db_path)
+    projects_dir = os.path.join(SCRIPT_DIR, "projects")
     
     if not os.path.exists(projects_dir):
         print("No projects directory found.")
