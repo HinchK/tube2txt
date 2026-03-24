@@ -1,9 +1,14 @@
 # Tube2Txt v3
 
+> **Inspiration:** This project is a modern rewrite of the original [Youtube2Webpage](https://github.com/obra/Youtube2Webpage) script.
+
 Tube2Txt is a central intelligence platform that converts YouTube videos and playlists into structured web pages with transcripts, screenshots, and AI-assisted analysis.
 
 ## New in v3.0
 
+- **AI Voice by Strunk & White**: AI-generated content (outlines, notes, etc.) follows the principles of *The Elements of Style* (1918) for concise, vigorous, and active writing.
+- **Vibrant Terminal Output**: AI-generated markdown is displayed in-color (Cyan) directly in your terminal for immediate review.
+- **Artifact Summary**: A complete list of absolute paths to all generated files (HTML, images, markdown, clips) is provided upon completion.
 - **Tube2Txt Hub**: A local web dashboard to browse your video library.
 - **Global Search**: Search for any word or phrase across **all** your processed videos via FTS5.
 - **Smart Clips**:
