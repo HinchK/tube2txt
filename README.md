@@ -12,9 +12,12 @@ This is a rewrite of [Youtube2Webpage](https://github.com/obra/Youtube2Webpage) 
 
 ## Installation Pipeline
 
-Tube2Txt requires a few system dependencies. Here is how to install them:
+Tube2Txt requires a few system dependencies.
 
-**1. Install Python 3.9+**
+- **macOS/Linux**: Follow the instructions below.
+- **Windows**: Please see the **[WINDOWS-INSTALL.md](WINDOWS-INSTALL.md)** guide for specific setup instructions.
+
+### 1. Install Python 3.9+
 - Mac (using Homebrew): `brew install python`
 
 **2. Install ffmpeg**
