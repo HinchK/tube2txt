@@ -3,26 +3,38 @@
 Tube2Txt is a central intelligence platform that converts YouTube videos and playlists into structured web pages with transcripts, screenshots, and AI-assisted analysis.
 
 ## New in v3.0
+
 - **Tube2Txt Hub**: A local web dashboard to browse your video library.
-- **Global Search**: Search for any word or phrase across **all** your processed videos.
-- **Smart Clips**: 
+- **Global Search**: Search for any word or phrase across **all** your processed videos via FTS5.
+- **Smart Clips**:
   - **Manual Clips**: Extract specific video segments with a simple command.
   - **AI-Driven Clips**: Gemini identifies the most interesting moments and extracts them automatically.
 - **SQLite Database**: Centralized storage for metadata and searchable transcripts.
+- **Environment-based Config**: Set `TUBE2TXT_DB` to customize your database location.
 
 ## Installation
 
 ### Method 1: Local (macOS/Linux)
+
 1. **Install System Dependencies**:
    - `yt-dlp`, `ffmpeg`, `python3`
-   - `pip3 install google-genai python-dotenv fastapi uvicorn --break-system-packages`
+   - ```bash
+     pip3 install google-genai python-dotenv fastapi uvicorn
+     ```
 
-2. **Make Executable**:
+2. **Configure API Key**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your Gemini API key
+   ```
+
+3. **Make Executable**:
    ```bash
    chmod +x tube2txt.sh
    ```
 
 ### Method 2: Docker
+
 ```bash
 docker-compose up --build
 # Then in another terminal:
@@ -32,18 +44,28 @@ docker-compose run tube2txt <project-name> <url> --ai
 ## Usage
 
 ### 1. Process a Video
+
 ```bash
 ./tube2txt.sh my-project "https://www.youtube.com/watch?v=..." --ai
 ```
 
+Output goes to `projects/my-project/` with:
+- `index.html` — transcript page with timestamped screenshots
+- `images/` — extracted video frames
+- `TUBE2TXT-OUTLINE.md` — AI-generated content (when `--ai` is used)
+
 ### 2. Launch the Hub
+
 ```bash
 ./tube2txt.sh hub
 # Open http://localhost:8000 in your browser
 ```
 
+The hub lets you browse all processed videos and search across every transcript.
+
 ### 3. Smart Clips
-- **AI Clipping**:
+
+- **AI Clipping** (Gemini picks the best moments):
   ```bash
   ./tube2txt.sh my-project "url" --ai --mode clips
   ```
@@ -52,12 +74,44 @@ docker-compose run tube2txt <project-name> <url> --ai
   ./tube2txt.sh clip my-project 00:01:00-00:02:30
   ```
 
+### 4. Re-index Existing Projects
+
+If you have projects processed before v3 (or need to rebuild the search index):
+
+```bash
+python3 index_existing.py
+```
+
 ### Options
-- `--ai`: Generate AI content.
-- `--mode <mode>`: AI mode: `outline` (default), `notes`, `recipe`, `technical`, `clips`.
-- `--parallel <N>`: Number of parallel `ffmpeg` processes (default: 4).
+
+| Flag | Description |
+|---|---|
+| `--ai` | Generate AI content |
+| `--mode <mode>` | AI mode: `outline` (default), `notes`, `recipe`, `technical`, `clips` |
+| `--parallel <N>` | Number of parallel `ffmpeg` processes (default: 4) |
+
+## Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `GEMINI_API_KEY` | Google Gemini API key (required for `--ai`) | — |
+| `TUBE2TXT_DB` | Path to SQLite database | `tube2txt.db` (in project root) |
+
+## Architecture
+
+```
+tube2txt.sh          ← Bash entry point (downloads, orchestrates)
+  └─ tube2txt.py     ← Python worker (VTT parsing, AI, HTML gen, DB indexing)
+hub.py               ← FastAPI dashboard (browse + search)
+index_existing.py    ← Migration script for legacy projects
+styles.css           ← Copied into each project
+projects/            ← All generated output (gitignored)
+tube2txt.db          ← SQLite with FTS5 search index (gitignored)
+```
 
 ## Features
-- **Parallel Processing**: Screenshot extraction is up to 10x faster.
+
+- **Parallel Processing**: Screenshot extraction is up to 10x faster via `xargs -P`.
 - **Playlist Support**: Pass a playlist URL to process everything at once.
+- **Docker Support**: Run everything in containers with `docker-compose`.
 - **Windows Support**: See [WINDOWS-INSTALL.md](WINDOWS-INSTALL.md).

@@ -47,7 +47,7 @@ Alternatively, you can use **WSL (Windows Subsystem for Linux)**.
    ```
 2. Install Python dependencies:
    ```bash
-   pip install google-genai python-dotenv
+   pip install google-genai python-dotenv fastapi uvicorn
    ```
 3. (Optional) Set up your API key:
    ```bash
@@ -59,7 +59,12 @@ Alternatively, you can use **WSL (Windows Subsystem for Linux)**.
 
 In Git Bash:
 ```bash
+# Process a video
 ./tube2txt.sh my-project "video-id-or-url" --ai --mode notes --parallel 4
+
+# Launch the hub dashboard
+./tube2txt.sh hub
+# Open http://localhost:8000 in your browser
 ```
 
 ---
