@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Downloaded files and large media
+*.mp4
+*.mkv
+*.webm
+*.vtt
