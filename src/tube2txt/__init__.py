@@ -4,6 +4,7 @@ import sys
 import argparse
 import glob
 import shutil
+import subprocess
 import concurrent.futures
 from .db import Database
 from .clipping import ClippingEngine
