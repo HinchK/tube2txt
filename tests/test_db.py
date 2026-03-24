@@ -33,7 +33,12 @@ def test_index_video():
             {"start": "00:00:01.000", "seconds": 1, "text": "Hello"},
             {"start": "00:00:05.000", "seconds": 5, "text": "World"}
         ]
-        db.index_video("test-slug", "http://example.com", segments)
+        metadata = {
+            "title": "Real Title",
+            "description": "Real Description",
+            "thumbnail_url": "http://thumb.com"
+        }
+        db.index_video("test-slug", "http://example.com", segments, metadata=metadata)
         
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -43,6 +48,9 @@ def test_index_video():
             video = cursor.fetchone()
             assert video is not None
             assert video["url"] == "http://example.com"
+            assert video["title"] == "Real Title"
+            assert video["description"] == "Real Description"
+            assert video["thumbnail_url"] == "http://thumb.com"
             
             cursor.execute("SELECT * FROM segments WHERE video_id=?", (video["id"],))
             rows = cursor.fetchall()

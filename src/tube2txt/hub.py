@@ -33,7 +33,7 @@ async def read_root():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tube2Txt Hub</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=line-clamp"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
@@ -68,10 +68,10 @@ async def read_root():
                         <template x-for="result in searchResults" :key="result.id">
                             <li class="p-4 hover:bg-gray-50 cursor-pointer" @click="openVideo(result.slug, result.start_ts)">
                                 <div class="flex items-center space-x-4">
-                                    <img :src="'/projects/' + result.slug + '/' + result.thumbnail_path" class="w-24 h-16 object-cover rounded shadow">
+                                    <img :src="result.thumbnail_url || ('/projects/' + result.slug + '/' + result.thumbnail_path)" class="w-24 h-16 object-cover rounded shadow">
                                     <div>
                                         <p class="font-medium text-indigo-600" x-text="result.title"></p>
-                                        <p class="text-sm text-gray-500" x-text="'[' + result.start_ts + '] ' + result.text"></p>
+                                        <p class="text-sm text-gray-500 line-clamp-1" x-text="'[' + result.start_ts + '] ' + result.text"></p>
                                     </div>
                                 </div>
                             </li>
@@ -86,19 +86,23 @@ async def read_root():
             <h2 class="text-xl font-semibold mb-6 text-gray-700">Your Video Library</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <template x-for="video in videos" :key="video.id">
-                    <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow cursor-pointer" @click="openVideo(video.slug)">
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow cursor-pointer flex flex-col h-full" @click="openVideo(video.slug)">
                         <div class="h-48 bg-gray-200 relative">
-                            <!-- Placeholder for latest thumbnail -->
-                            <div class="absolute inset-0 flex items-center justify-center text-gray-400">
+                            <img :src="video.thumbnail_url" class="w-full h-full object-cover" x-show="video.thumbnail_url">
+                            <!-- Fallback if no thumbnail -->
+                            <div class="absolute inset-0 flex items-center justify-center text-gray-400" x-show="!video.thumbnail_url">
                                 <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                             </div>
                         </div>
-                        <div class="p-4">
-                            <h3 class="font-bold text-gray-800 truncate" x-text="video.title"></h3>
-                            <p class="text-xs text-gray-500 mt-1" x-text="'Processed: ' + new Date(video.processed_at).toLocaleDateString()"></p>
+                        <div class="p-4 flex-grow">
+                            <h3 class="font-bold text-gray-800 line-clamp-2" x-text="video.title"></h3>
+                            <p class="text-xs text-gray-500 mt-2 line-clamp-3" x-text="video.description"></p>
+                        </div>
+                        <div class="p-4 pt-0">
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wider" x-text="'Processed: ' + new Date(video.processed_at).toLocaleDateString()"></p>
                         </div>
                     </div>
                 </template>
@@ -147,9 +151,9 @@ async def get_videos():
 async def search(q: str = Query(...)):
     conn = get_db()
     cursor = conn.cursor()
-    # Join with videos to get slug and title
+    # Join with videos to get slug, title and thumbnail_url
     query = """
-        SELECT s.*, v.slug, v.title
+        SELECT s.*, v.slug, v.title, v.thumbnail_url
         FROM segments s
         JOIN videos v ON s.video_id = v.id
         WHERE s.id IN (

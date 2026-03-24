@@ -51,7 +51,7 @@ def process_video_logic(url, slug, mode, ai_flag, db_path, parallel, projects_di
     
     # Download
     print("Downloading video and subtitles...")
-    video_file, vtt_file = Downloader.get_video_and_subs(url, project_path)
+    video_file, vtt_file, metadata = Downloader.get_video_and_subs(url, project_path)
     
     if not video_file or not vtt_file:
         print(f"Error: Could not download video or subtitles for {slug}.")
@@ -63,12 +63,14 @@ def process_video_logic(url, slug, mode, ai_flag, db_path, parallel, projects_di
     parser = VTTParser(vtt_path)
     segments = parser.parse()
     
-    html_gen = HTMLGenerator(segments, url, slug)
+    # Use real title if available for HTML
+    display_title = metadata.get("title", slug)
+    html_gen = HTMLGenerator(segments, url, display_title)
     html_gen.generate(os.path.join(project_path, "index.html"))
     
     # DB Indexing
     db = Database(db_path)
-    db.index_video(slug, url, segments)
+    db.index_video(slug, url, segments, metadata=metadata)
     print(f"Video indexed in DB: {db_path}")
     
     # AI Content

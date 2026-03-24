@@ -15,9 +15,20 @@ class Database:
                     slug TEXT UNIQUE,
                     url TEXT,
                     title TEXT,
+                    description TEXT,
+                    thumbnail_url TEXT,
                     processed_at DATETIME
                 )
             """)
+            
+            # Migration: check if columns exist
+            cursor.execute("PRAGMA table_info(videos)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "description" not in columns:
+                cursor.execute("ALTER TABLE videos ADD COLUMN description TEXT")
+            if "thumbnail_url" not in columns:
+                cursor.execute("ALTER TABLE videos ADD COLUMN thumbnail_url TEXT")
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS segments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,11 +44,17 @@ class Database:
             cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS segments_search USING fts5(segment_id, text)")
             conn.commit()
 
-    def index_video(self, slug, url, segments):
+    def index_video(self, slug, url, segments, metadata=None):
+        title = metadata.get("title", slug) if metadata else slug
+        description = metadata.get("description", "") if metadata else ""
+        thumbnail_url = metadata.get("thumbnail_url", "") if metadata else ""
+        
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO videos (slug, url, title, processed_at) VALUES (?, ?, ?, ?)",
-                         (slug, url, slug, datetime.now().isoformat()))
+            cursor.execute("""
+                INSERT OR REPLACE INTO videos (slug, url, title, description, thumbnail_url, processed_at) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (slug, url, title, description, thumbnail_url, datetime.now().isoformat()))
             video_id = cursor.lastrowid
             
             # Clear old segments if any
