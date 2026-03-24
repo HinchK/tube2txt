@@ -1,14 +1,47 @@
+# OS Specific
+.DS_Store
+Thumbs.db
+
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Virtual Environment
 venv/
 env/
 .env
+.venv/
+ENV/
 
-# Downloaded files and large media
+# Secrets
+.env
+*.key
+*.pem
+
+# Project Output & Media
+# (Ignore directories created for projects)
+*/images/
+*/index.html
+*/TUBE2TXT-OUTLINE.md
+*/styles.css
+*/video.*
+# Or more generally if you name projects consistently:
+# test-project/
+# my-video/
+
+# Specific downloaded formats
 *.mp4
 *.mkv
 *.webm
 *.vtt
+*.jpg
+*.jpeg
+
+# Tool Specific
+GEM-PLAN/
+.idea/
+.vscode/

@@ -33,6 +33,12 @@ SLUG=$1
 URL=$2
 AI_FLAG=""
 
+# If URL is just an 11-char ID (common for YouTube), turn it into a full URL
+if [[ ! "$URL" =~ ^http ]] && [[ ${#URL} -eq 11 ]]; then
+    echo "Detected video ID: $URL. Using full YouTube URL."
+    URL="https://www.youtube.com/watch?v=$URL"
+fi
+
 # Shift arguments to check for flags
 shift 2 || true # In case only 1 argument was provided
 while [[ "$#" -gt 0 ]]; do

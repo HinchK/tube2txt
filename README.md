@@ -50,6 +50,20 @@ To use the `--ai` flag and automatically generate markdown outlines using Gemini
    ```
    *Tip: Add `export GEMINI_API_KEY="your-api-key-here"` to your `~/.zshrc` or `~/.bash_profile` so it loads on every session automatically.*
 
+### Using a .env file (Recommended)
+
+Alternatively, you can create a `.env` file in the project directory based on the provided template:
+
+```bash
+cp .env.example .env
+# edit .env and replace 'your_gemini_api_key_here' with your real key
+```
+
+If you use a `.env` file, you should also install `python-dotenv`:
+```bash
+pip3 install python-dotenv --break-system-packages
+```
+
 ## Usage
 
 ```bash

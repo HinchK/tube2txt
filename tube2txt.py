@@ -3,6 +3,11 @@ import re
 import sys
 import json
 import argparse
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 from google import genai
 from google.genai import types
 
