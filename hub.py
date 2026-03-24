@@ -5,18 +5,21 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List, Optional
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(SCRIPT_DIR, "tube2txt.db"))
+PROJECTS_DIR = os.path.join(SCRIPT_DIR, "projects")
+
 app = FastAPI(title="Tube2Txt Hub")
 
 # Database helper
 def get_db():
-    db_path = "tube2txt.db"
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 # Serve projects directory
-if os.path.exists("projects"):
-    app.mount("/projects", StaticFiles(directory="projects"), name="projects")
+if os.path.exists(PROJECTS_DIR):
+    app.mount("/projects", StaticFiles(directory=PROJECTS_DIR), name="projects")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():

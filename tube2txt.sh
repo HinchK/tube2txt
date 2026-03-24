@@ -9,7 +9,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PYTHON_SCRIPT="$SCRIPT_DIR/tube2txt.py"
 STYLES_CSS="$SCRIPT_DIR/styles.css"
 HUB_SCRIPT="$SCRIPT_DIR/hub.py"
-PROJECTS_DIR="$SCRIPT_DIR/OUTPUT"
+PROJECTS_DIR="$SCRIPT_DIR/projects"
+TUBE2TXT_DB="${TUBE2TXT_DB:-$SCRIPT_DIR/tube2txt.db}"
 
 # Load environment variables if .env exists
 if [[ -f "$SCRIPT_DIR/.env" ]]; then
@@ -163,7 +164,7 @@ process_video() {
         --output-html "index.html" \
         --output-outline "$OUTLINE_FILE" \
         --mode "$MODE" \
-        --db "$SCRIPT_DIR/tube2txt.db" \
+        --db "$TUBE2TXT_DB" \
         $AI_FLAG)
 
     # Extract images in parallel
