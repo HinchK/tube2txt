@@ -6,9 +6,9 @@ set -eo pipefail
 
 # Configuration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PYTHON_SCRIPT="$SCRIPT_DIR/tube2txt.py"
+PYTHON_SCRIPT="tube2txt"
 STYLES_CSS="$SCRIPT_DIR/styles.css"
-HUB_SCRIPT="$SCRIPT_DIR/hub.py"
+HUB_CMD="tube2txt-hub"
 PROJECTS_DIR="$SCRIPT_DIR/projects"
 TUBE2TXT_DB="${TUBE2TXT_DB:-$SCRIPT_DIR/tube2txt.db}"
 VERBOSE=0
@@ -48,10 +48,8 @@ usage() {
 
 # Hub command
 if [[ "${1:-}" == "hub" ]]; then
-    echo "Re-indexing existing projects..."
-    python3 "$SCRIPT_DIR/index_existing.py"
     echo "Starting Tube2Txt Hub at http://localhost:8000"
-    python3 "$HUB_SCRIPT"
+    $HUB_CMD
     exit 0
 fi
 
@@ -66,7 +64,7 @@ if [[ "${1:-}" == "clip" ]]; then
     fi
     echo "Extracting clip $RANGE for $SLUG..."
     cd "$PROJECTS_DIR/$SLUG"
-    python3 "$PYTHON_SCRIPT" --clip "$RANGE" --video-file "$(basename "$VIDEO_FILE")"
+    $PYTHON_SCRIPT --clip "$RANGE" --video-file "$(basename "$VIDEO_FILE")"
     exit 0
 fi
 
@@ -158,7 +156,6 @@ process_video() {
     mkdir -p "$PROJECTS_DIR/$VIDEO_SLUG/images"
     
     local ABS_STYLES_CSS=$(realpath "$STYLES_CSS")
-    local ABS_PYTHON_SCRIPT=$(realpath "$PYTHON_SCRIPT")
 
     pushd "$PROJECTS_DIR/$VIDEO_SLUG" > /dev/null
 
@@ -196,9 +193,9 @@ process_video() {
     local MODE_UPPER=$(echo "$MODE" | tr '[:lower:]' '[:upper:]')
     local OUTLINE_FILE="TUBE2TXT-${MODE_UPPER}.md"
     
-    v_echo "Running Python worker: $ABS_PYTHON_SCRIPT"
+    v_echo "Running Python worker: $PYTHON_SCRIPT"
     # Run Python logic and capture output
-    local PY_OUTPUT=$(python3 "$ABS_PYTHON_SCRIPT" \
+    local PY_OUTPUT=$($PYTHON_SCRIPT \
         --vtt "$VTT_FILE" \
         --url "$VIDEO_URL" \
         --slug "$VIDEO_SLUG" \
@@ -233,7 +230,7 @@ process_video() {
         echo "$PY_OUTPUT" | grep "^CLIP:" | while read -r line; do
             local RANGE=$(echo "$line" | cut -d'|' -f2)
             echo "Extracting AI clip: $RANGE"
-            python3 "$ABS_PYTHON_SCRIPT" --clip "$RANGE" --video-file "$VIDEO_FILE"
+            $PYTHON_SCRIPT --clip "$RANGE" --video-file "$VIDEO_FILE"
         done
     fi
 

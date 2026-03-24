@@ -3,15 +3,17 @@ import sqlite3
 import re
 from tube2txt import Database, VTTParser
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# For pip-installed packages, the database and projects dir should be relative to CWD
+# unless specified via environment variables.
+CWD = os.getcwd()
 
 def migrate():
-    db_path = os.environ.get("TUBE2TXT_DB", os.path.join(SCRIPT_DIR, "tube2txt.db"))
+    db_path = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
     db = Database(db_path)
-    projects_dir = os.path.join(SCRIPT_DIR, "projects")
+    projects_dir = os.path.join(CWD, "projects")
     
     if not os.path.exists(projects_dir):
-        print("No projects directory found.")
+        print(f"No projects directory found at {projects_dir}")
         return
 
     for slug in os.listdir(projects_dir):

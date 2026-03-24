@@ -15,14 +15,15 @@ RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o 
 # Set working directory
 WORKDIR /app
 
-# Copy requirement files
-COPY tube2txt.py .
+# Copy project files
+COPY src/ ./src/
+COPY pyproject.toml .
+COPY README.md .
 COPY tube2txt.sh .
-COPY hub.py .
 COPY styles.css .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir google-genai python-dotenv fastapi uvicorn
+# Install the package
+RUN pip install --no-cache-dir .
 
 # Make scripts executable
 RUN chmod +x tube2txt.sh
@@ -33,6 +34,5 @@ RUN mkdir -p /app/projects
 # Default port for the Hub
 EXPOSE 8000
 
-# Entrypoint allows running the Hub or the Processing script
 # By default, start the Hub
-CMD ["python3", "hub.py"]
+CMD ["tube2txt-hub"]
