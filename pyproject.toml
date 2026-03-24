@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tube2txt"
-version = "3.0.0"
+version = "3.1.0"
 authors = [
   { name="Kasey Hinchman", email="kasey.hinchman@gmail.com" },
 ]
 description = "A hybrid Bash/Python tool to convert YouTube videos to structured web pages with AI outlines, a local hub dashboard, and smart clips."
 readme = "README.md"
+license = { text="MIT" }
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -21,11 +22,14 @@ dependencies = [
     "python-dotenv",
     "fastapi",
     "uvicorn",
+    "yt-dlp",
 ]
 
 [project.scripts]
-tube2txt-py = "tube2txt:main"
+tube2txt = "tube2txt:main"
+tube2txt-hub = "tube2txt.hub:start_hub"
+tube2txt-index = "tube2txt.index_existing:migrate"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["tube2txt.py"]
+where = ["src"]
+include = ["tube2txt*"]

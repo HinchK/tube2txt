@@ -1,13 +1,16 @@
 import os
 import sqlite3
+import uvicorn
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List, Optional
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(SCRIPT_DIR, "tube2txt.db"))
-PROJECTS_DIR = os.path.join(SCRIPT_DIR, "projects")
+# For pip-installed packages, the database and projects dir should be relative to CWD
+# unless specified via environment variables.
+CWD = os.getcwd()
+DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
+PROJECTS_DIR = os.path.join(CWD, "projects")
 
 app = FastAPI(title="Tube2Txt Hub")
 
@@ -159,6 +162,12 @@ async def search(q: str = Query(...)):
     conn.close()
     return results
 
-if __name__ == "__main__":
-    import uvicorn
+def start_hub():
+    """Entry point for the hub command."""
+    print(f"Starting Tube2Txt Hub at http://localhost:8000")
+    print(f"Database: {DB_PATH}")
+    print(f"Projects: {PROJECTS_DIR}")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    start_hub()

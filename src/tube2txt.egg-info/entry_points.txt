@@ -1,0 +1,3 @@
+[console_scripts]
+tube2txt = tube2txt:main
+tube2txt-hub = tube2txt.hub:start_hub
