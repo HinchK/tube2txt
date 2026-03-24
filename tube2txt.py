@@ -14,6 +14,10 @@ except ImportError:
 from google import genai
 from google.genai import types
 
+# Constants for terminal coloring
+CLI_COLOR_CYAN = "\033[36m"
+CLI_COLOR_RESET = "\033[0m"
+
 class Database:
     def __init__(self, db_path="tube2txt.db"):
         self.db_path = db_path
@@ -91,18 +95,44 @@ class GeminiClient:
         full_transcript = "\n".join([f"[{s['start']}] {s['text']}" for s in segments])
         
         prompts = {
-            'outline': "Provide a clear, high-level markdown outline of the content. Include timestamps in brackets [HH:MM:SS] for each section.",
-            'notes': "Create detailed study notes from this transcript. Include key takeaways, definitions of any complex terms, and a summary for each major section. Use timestamps in brackets [HH:MM:SS].",
-            'recipe': "Extract any recipes, ingredients, and cooking steps from this transcript. Format them clearly in markdown with timestamps [HH:MM:SS].",
-            'technical': "Provide a technical deep-dive or documentation based on this transcript. Focus on implementation details, code concepts, and architectural points. Use timestamps in brackets [HH:MM:SS].",
-            'clips': """Identify the 3 most interesting, viral, or high-value 30-60 second segments from this video. 
-            For each, provide:
-            1. A catchy title.
-            2. Start and End timestamps (format: HH:MM:SS-HH:MM:SS).
-            3. A brief reason why it's a great clip.
-            Return ONLY the data in this format:
-            CLIP:[Title]|[HH:MM:SS-HH:MM:SS]|[Reason]
-            """
+            'outline': (
+                "Provide a clear, high-level markdown outline of the content. "
+                "Include timestamps in brackets [HH:MM:SS] for each section. "
+                "Adhere to 'The Elements of Style' (1918): omit needless words, "
+                "be specific, concrete, and definite."
+            ),
+            'notes': (
+                "Create detailed study notes from this transcript. "
+                "Adhere strictly to the principles of 'The Elements of Style' (1918): "
+                "Be clear, concise, and use the active voice. Omit needless words. "
+                "Include key takeaways, definitions of complex terms, and a summary for each major section. "
+                "Use timestamps in brackets [HH:MM:SS]."
+            ),
+            'recipe': (
+                "Extract recipes, ingredients, and cooking steps from this transcript. "
+                "Follow 'The Elements of Style' (1918): use the active voice for instructions, "
+                "be specific and definite, and omit needless words. "
+                "Format them clearly in markdown with timestamps [HH:MM:SS]."
+            ),
+            'technical': (
+                "Provide a technical deep-dive or documentation based on this transcript. "
+                "Adhere to 'The Elements of Style' (1918): use definite, specific, concrete language. "
+                "Omit needless words. Focus on implementation details, code concepts, and architectural points. "
+                "Use timestamps in brackets [HH:MM:SS]."
+            ),
+            'clips': (
+                "Identify the 3 most interesting, viral, or high-value 30-60 second segments from this video. "
+                "In your descriptions, follow 'The Elements of Style' (1918): "
+                "use active voice, be specific, and omit needless words. "
+                "For each, provide:\n"
+                "1. A catchy title.\n"
+                "2. Start and End timestamps (format: HH:MM:SS-HH:MM:SS).\n"
+                "3. A brief reason why it's a great clip.\n"
+                "Return ONLY the data in this format:\n"
+                "CLIP:[Title]|[HH:MM:SS-HH:MM:SS]|[Reason]\n"
+                "After the CLIP: lines, you may provide a brief markdown summary of why these clips represent the essence of the video, "
+                "maintaining a concise, vigorous style."
+            )
         }
         
         system_prompt = prompts.get(mode, prompts['outline'])
@@ -117,6 +147,27 @@ Transcript:
             contents=prompt
         )
         return response.text
+
+    def determine_best_mode(self, outline):
+        prompt = f"""
+Based on the following video outline, determine which of these three modes is most appropriate for a deep-dive:
+1. 'recipe' (if it's a cooking video or contains a recipe)
+2. 'technical' (if it's about coding, engineering, or complex systems)
+3. 'notes' (if it's an educational talk, lecture, or general information)
+
+Outline:
+{outline}
+
+Return ONLY the word: 'recipe', 'technical', or 'notes'.
+"""
+        response = self.client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        mode = response.text.strip().lower()
+        if 'recipe' in mode: return 'recipe'
+        if 'technical' in mode: return 'technical'
+        return 'notes'
 
 class VTTParser:
     def __init__(self, file_path):
@@ -223,7 +274,7 @@ def main():
     parser.add_argument("--slug", help="Project slug")
     parser.add_argument("--output-html", help="Path to output HTML")
     parser.add_argument("--output-outline", help="Path to output markdown content")
-    parser.add_argument("--mode", default="outline", choices=["outline", "notes", "recipe", "technical", "clips"], help="AI mode")
+    parser.add_argument("--mode", default="outline", help="Requested AI mode")
     parser.add_argument("--ai", action="store_true", help="Run AI generation")
     parser.add_argument("--db", default="tube2txt.db", help="Path to SQLite DB")
     parser.add_argument("--clip", help="Extract a clip: START-END (HH:MM:SS-HH:MM:SS)")
@@ -245,28 +296,8 @@ def main():
             print(f"CLIP_SAVED:clips/{output_name}")
         sys.exit(0)
 
-    # Interactive prompts if arguments are missing and we're in a terminal
-    if sys.stdin.isatty():
-        if not args.url:
-            args.url = input("Enter YouTube URL or Video ID: ").strip()
-        if not args.slug:
-            # Generate a default slug from URL if possible
-            if args.url:
-                if '=' in args.url:
-                    default_slug = args.url.split('=')[-1]
-                else:
-                    default_slug = args.url.split('/')[-1]
-                args.slug = input(f"Enter project name (default '{default_slug}'): ").strip() or default_slug
-            else:
-                args.slug = input("Enter project name: ").strip()
-        
-        if not args.output_html:
-            args.output_html = "index.html"
-        if not args.output_outline:
-            args.output_outline = f"TUBE2TXT-{args.mode.upper()}.md"
-
     if not args.url or not args.slug:
-        print("Error: Missing required arguments (URL and Slug). Use --help for usage.")
+        print("Error: Missing required arguments (URL and Slug).")
         sys.exit(1)
 
     if args.vtt:
@@ -281,22 +312,58 @@ def main():
         db.index_video(args.slug, args.url, segments)
         print(f"Video indexed in DB: {args.db}")
 
-        if args.ai:
-            api_key = os.environ.get("GEMINI_API_KEY")
-            if not api_key:
-                print("Warning: GEMINI_API_KEY not found. Skipping AI generation.")
-            else:
-                client = GeminiClient(api_key)
-                content = client.generate_content(segments, args.mode)
-                with open(args.output_outline, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                print(f"AI {args.mode.capitalize()} generated at {args.output_outline}")
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if args.ai and not api_key:
+            print("Warning: GEMINI_API_KEY not found. Skipping AI generation.")
+        
+        if api_key:
+            client = GeminiClient(api_key)
+            
+            # 1. Always generate the outline
+            print("\n--- GENERATING OUTLINE ---")
+            outline = client.generate_content(segments, mode='outline')
+            outline_path = f"TUBE2TXT-OUTLINE.md"
+            with open(outline_path, 'w', encoding='utf-8') as f:
+                f.write(outline)
+            
+            # Print outline in cyan
+            for line in outline.split('\n'):
+                print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
+            print(f"\nAI Outline saved at {outline_path}")
+
+            # 2. Determine best additional mode and generate it
+            best_mode = client.determine_best_mode(outline)
+            print(f"\n--- GENERATING ADDITIONAL CONTENT ({best_mode.upper()}) ---")
+            additional_content = client.generate_content(segments, mode=best_mode)
+            additional_path = f"TUBE2TXT-{best_mode.upper()}.md"
+            with open(additional_path, 'w', encoding='utf-8') as f:
+                f.write(additional_content)
+            
+            # Print additional content in cyan
+            for line in additional_content.split('\n'):
+                # In case additional mode generates clips (though unlikely with current logic)
+                if line.startswith('CLIP:'):
+                    print(line)
+                    print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
+                else:
+                    print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
+            print(f"\nAI {best_mode.capitalize()} saved at {additional_path}")
+
+            # 3. Special case for Clips if explicitly requested
+            if args.mode == 'clips':
+                print("\n--- GENERATING CLIPS ---")
+                clips_content = client.generate_content(segments, mode='clips')
+                clips_path = "TUBE2TXT-CLIPS.md"
+                with open(clips_path, 'w', encoding='utf-8') as f:
+                    f.write(clips_content)
                 
-                # If mode is clips, output CLIP: headers for Bash to parse
-                if args.mode == 'clips':
-                    for line in content.split('\n'):
-                        if line.startswith('CLIP:'):
-                            print(line)
+                # For clips, print raw CLIP: for bash and colored version for user
+                for line in clips_content.split('\n'):
+                    if line.startswith('CLIP:'):
+                        print(line) # Raw for bash
+                        print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
+                    else:
+                        print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
 
         # Output timestamps for Bash to use for image extraction
         for seg in segments:
