@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  tube2txt:
+    build: .
+    volumes:
+      - ./output:/output
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    # Usage: docker-compose run tube2txt project-name "url" --ai

@@ -59,7 +59,7 @@ Alternatively, you can use **WSL (Windows Subsystem for Linux)**.
 
 In Git Bash:
 ```bash
-./tube2txt.sh my-project "video-id-or-url" --ai
+./tube2txt.sh my-project "video-id-or-url" --ai --mode notes --parallel 4
 ```
 
 ---

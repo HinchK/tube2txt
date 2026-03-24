@@ -115,52 +115,88 @@ class GeminiClient:
             raise ValueError("GEMINI_API_KEY environment variable is required.")
         self.client = genai.Client(api_key=api_key)
 
-    def generate_outline(self, segments):
+    def generate_content(self, segments, mode='outline'):
         full_transcript = "\n".join([f"[{s['start']}] {s['text']}" for s in segments])
+        
+        prompts = {
+            'outline': "Provide a clear, high-level markdown outline of the content. Include timestamps in brackets [HH:MM:SS] for each section.",
+            'notes': "Create detailed study notes from this transcript. Include key takeaways, definitions of any complex terms, and a summary for each major section. Use timestamps in brackets [HH:MM:SS].",
+            'recipe': "Extract any recipes, ingredients, and cooking steps from this transcript. Format them clearly in markdown with timestamps [HH:MM:SS].",
+            'technical': "Provide a technical deep-dive or documentation based on this transcript. Focus on implementation details, code concepts, and architectural points. Use timestamps in brackets [HH:MM:SS]."
+        }
+        
+        system_prompt = prompts.get(mode, prompts['outline'])
         prompt = f"""
-I have a transcript of a YouTube video. Please provide a clear, high-level markdown outline of the content.
-Include timestamps in brackets [HH:MM:SS] for each section. Use the timestamps from the transcript provided.
+I have a transcript of a YouTube video. {system_prompt}
 
 Transcript:
 {full_transcript}
 """
         response = self.client.models.generate_content(
-            model='gemini-3-flash-preview',
+            model='gemini-2.0-flash',
             contents=prompt
         )
         return response.text
 
 def main():
     parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
-    parser.add_argument("--vtt", required=True, help="Path to VTT file")
-    parser.add_argument("--url", required=True, help="YouTube video URL")
-    parser.add_argument("--slug", required=True, help="Project slug")
-    parser.add_argument("--output-html", required=True, help="Path to output HTML")
-    parser.add_argument("--output-outline", required=True, help="Path to output markdown outline")
-    parser.add_argument("--ai", action="store_true", help="Run AI outline generation")
+    parser.add_argument("--vtt", help="Path to VTT file")
+    parser.add_argument("--url", help="YouTube video URL")
+    parser.add_argument("--slug", help="Project slug")
+    parser.add_argument("--output-html", help="Path to output HTML")
+    parser.add_argument("--output-outline", help="Path to output markdown content")
+    parser.add_argument("--mode", default="outline", choices=["outline", "notes", "recipe", "technical"], help="AI mode")
+    parser.add_argument("--ai", action="store_true", help="Run AI generation")
     
     args = parser.parse_args()
 
-    vtt_parser = VTTParser(args.vtt)
-    segments = vtt_parser.parse()
+    # Interactive prompts if arguments are missing and we're in a terminal
+    if sys.stdin.isatty():
+        if not args.url:
+            args.url = input("Enter YouTube URL or Video ID: ").strip()
+        if not args.slug:
+            # Generate a default slug from URL if possible
+            if args.url:
+                if '=' in args.url:
+                    default_slug = args.url.split('=')[-1]
+                else:
+                    default_slug = args.url.split('/')[-1]
+                args.slug = input(f"Enter project name (default '{default_slug}'): ").strip() or default_slug
+            else:
+                args.slug = input("Enter project name: ").strip()
+        
+        if not args.output_html:
+            args.output_html = "index.html"
+        if not args.output_outline:
+            args.output_outline = f"TUBE2TXT-{args.mode.upper()}.md"
 
-    html_gen = HTMLGenerator(segments, args.url, args.slug)
-    html_gen.generate(args.output_html)
+    if not args.url or not args.slug:
+        print("Error: Missing required arguments (URL and Slug). Use --help for usage.")
+        sys.exit(1)
 
-    if args.ai:
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            print("Warning: GEMINI_API_KEY not found. Skipping outline generation.")
-        else:
-            client = GeminiClient(api_key)
-            outline = client.generate_outline(segments)
-            with open(args.output_outline, 'w', encoding='utf-8') as f:
-                f.write(outline)
-            print(f"Outline generated at {args.output_outline}")
+    # Note: VTT file will be handled by Bash script, but if we're running standalone
+    # we might need to wait for it or ensure it exists.
+    if args.vtt:
+        vtt_parser = VTTParser(args.vtt)
+        segments = vtt_parser.parse()
 
-    # Output timestamps for Bash to use for image extraction
-    for seg in segments:
-        print(f"TIMESTAMP:{seg['start']}")
+        html_gen = HTMLGenerator(segments, args.url, args.slug)
+        html_gen.generate(args.output_html)
+
+        if args.ai:
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                print("Warning: GEMINI_API_KEY not found. Skipping AI generation.")
+            else:
+                client = GeminiClient(api_key)
+                content = client.generate_content(segments, args.mode)
+                with open(args.output_outline, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"AI {args.mode.capitalize()} generated at {args.output_outline}")
+
+        # Output timestamps for Bash to use for image extraction
+        for seg in segments:
+            print(f"TIMESTAMP:{seg['start']}")
 
 if __name__ == "__main__":
     main()

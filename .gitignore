@@ -24,6 +24,7 @@ ENV/
 
 # Project Output & Media
 # (Ignore directories created for projects)
+OUTPUT/
 */images/
 */index.html
 */TUBE2TXT-OUTLINE.md
