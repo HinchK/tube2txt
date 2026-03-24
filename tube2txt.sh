@@ -12,6 +12,7 @@ HUB_SCRIPT="$SCRIPT_DIR/hub.py"
 PROJECTS_DIR="$SCRIPT_DIR/projects"
 TUBE2TXT_DB="${TUBE2TXT_DB:-$SCRIPT_DIR/tube2txt.db}"
 VERBOSE=0
+ARTIFACTS_FILE=$(mktemp)
 
 # Load environment variables if .env exists
 if [[ -f "$SCRIPT_DIR/.env" ]]; then
@@ -207,6 +208,9 @@ process_video() {
         --db "$TUBE2TXT_DB" \
         $AI_FLAG)
 
+    # Display AI output (filter out markers)
+    echo "$PY_OUTPUT" | grep -vE "^(TIMESTAMP|CLIP):"
+
     # Extract images in parallel
     echo "Extracting images in parallel ($PARALLEL processes)..."
     local TS_FILE=$(mktemp)
@@ -234,6 +238,28 @@ process_video() {
     fi
 
     echo "Finished: $VIDEO_SLUG"
+
+    # Log artifacts
+    {
+        echo "[$VIDEO_SLUG Artifacts]"
+        echo "  - Index Page:  $(realpath index.html)"
+        echo "  - Stylesheet:  $(realpath styles.css)"
+        echo "  - Video File:  $(realpath "$VIDEO_FILE")"
+        echo "  - Images Dir:  $(realpath images/)"
+        if [[ -f "TUBE2TXT-OUTLINE.md" ]]; then
+            echo "  - AI Outline:  $(realpath TUBE2TXT-OUTLINE.md)"
+        fi
+        for md in TUBE2TXT-*.md; do
+            if [[ "$md" != "TUBE2TXT-OUTLINE.md" && -f "$md" ]]; then
+                echo "  - AI Extra:    $(realpath "$md")"
+            fi
+        done
+        if [[ -d "clips" ]]; then
+            echo "  - Clips Dir:   $(realpath clips/)"
+        fi
+        echo ""
+    } >> "$ARTIFACTS_FILE"
+
     popd > /dev/null
 }
 
@@ -270,3 +296,10 @@ else
 fi
 
 echo "All tasks complete!"
+
+if [[ -f "$ARTIFACTS_FILE" ]]; then
+    echo ""
+    echo "--- GENERATED ARTIFACTS ---"
+    cat "$ARTIFACTS_FILE"
+    rm "$ARTIFACTS_FILE"
+fi

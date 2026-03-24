@@ -14,6 +14,10 @@ except ImportError:
 from google import genai
 from google.genai import types
 
+# Constants for terminal coloring
+CLI_COLOR_CYAN = "\033[36m"
+CLI_COLOR_RESET = "\033[0m"
+
 class Database:
     def __init__(self, db_path="tube2txt.db"):
         self.db_path = db_path
@@ -91,18 +95,44 @@ class GeminiClient:
         full_transcript = "\n".join([f"[{s['start']}] {s['text']}" for s in segments])
         
         prompts = {
-            'outline': "Provide a clear, high-level markdown outline of the content. Include timestamps in brackets [HH:MM:SS] for each section.",
-            'notes': "Create detailed study notes from this transcript. Include key takeaways, definitions of any complex terms, and a summary for each major section. Use timestamps in brackets [HH:MM:SS].",
-            'recipe': "Extract any recipes, ingredients, and cooking steps from this transcript. Format them clearly in markdown with timestamps [HH:MM:SS].",
-            'technical': "Provide a technical deep-dive or documentation based on this transcript. Focus on implementation details, code concepts, and architectural points. Use timestamps in brackets [HH:MM:SS].",
-            'clips': """Identify the 3 most interesting, viral, or high-value 30-60 second segments from this video. 
-            For each, provide:
-            1. A catchy title.
-            2. Start and End timestamps (format: HH:MM:SS-HH:MM:SS).
-            3. A brief reason why it's a great clip.
-            Return ONLY the data in this format:
-            CLIP:[Title]|[HH:MM:SS-HH:MM:SS]|[Reason]
-            """
+            'outline': (
+                "Provide a clear, high-level markdown outline of the content. "
+                "Include timestamps in brackets [HH:MM:SS] for each section. "
+                "Adhere to 'The Elements of Style' (1918): omit needless words, "
+                "be specific, concrete, and definite."
+            ),
+            'notes': (
+                "Create detailed study notes from this transcript. "
+                "Adhere strictly to the principles of 'The Elements of Style' (1918): "
+                "Be clear, concise, and use the active voice. Omit needless words. "
+                "Include key takeaways, definitions of complex terms, and a summary for each major section. "
+                "Use timestamps in brackets [HH:MM:SS]."
+            ),
+            'recipe': (
+                "Extract recipes, ingredients, and cooking steps from this transcript. "
+                "Follow 'The Elements of Style' (1918): use the active voice for instructions, "
+                "be specific and definite, and omit needless words. "
+                "Format them clearly in markdown with timestamps [HH:MM:SS]."
+            ),
+            'technical': (
+                "Provide a technical deep-dive or documentation based on this transcript. "
+                "Adhere to 'The Elements of Style' (1918): use definite, specific, concrete language. "
+                "Omit needless words. Focus on implementation details, code concepts, and architectural points. "
+                "Use timestamps in brackets [HH:MM:SS]."
+            ),
+            'clips': (
+                "Identify the 3 most interesting, viral, or high-value 30-60 second segments from this video. "
+                "In your descriptions, follow 'The Elements of Style' (1918): "
+                "use active voice, be specific, and omit needless words. "
+                "For each, provide:\n"
+                "1. A catchy title.\n"
+                "2. Start and End timestamps (format: HH:MM:SS-HH:MM:SS).\n"
+                "3. A brief reason why it's a great clip.\n"
+                "Return ONLY the data in this format:\n"
+                "CLIP:[Title]|[HH:MM:SS-HH:MM:SS]|[Reason]\n"
+                "After the CLIP: lines, you may provide a brief markdown summary of why these clips represent the essence of the video, "
+                "maintaining a concise, vigorous style."
+            )
         }
         
         system_prompt = prompts.get(mode, prompts['outline'])
@@ -295,7 +325,10 @@ def main():
             outline_path = f"TUBE2TXT-OUTLINE.md"
             with open(outline_path, 'w', encoding='utf-8') as f:
                 f.write(outline)
-            print(outline)
+            
+            # Print outline in cyan
+            for line in outline.split('\n'):
+                print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
             print(f"\nAI Outline saved at {outline_path}")
 
             # 2. Determine best additional mode and generate it
@@ -305,7 +338,15 @@ def main():
             additional_path = f"TUBE2TXT-{best_mode.upper()}.md"
             with open(additional_path, 'w', encoding='utf-8') as f:
                 f.write(additional_content)
-            print(additional_content)
+            
+            # Print additional content in cyan
+            for line in additional_content.split('\n'):
+                # In case additional mode generates clips (though unlikely with current logic)
+                if line.startswith('CLIP:'):
+                    print(line)
+                    print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
+                else:
+                    print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
             print(f"\nAI {best_mode.capitalize()} saved at {additional_path}")
 
             # 3. Special case for Clips if explicitly requested
@@ -315,10 +356,14 @@ def main():
                 clips_path = "TUBE2TXT-CLIPS.md"
                 with open(clips_path, 'w', encoding='utf-8') as f:
                     f.write(clips_content)
-                print(clips_content)
+                
+                # For clips, print raw CLIP: for bash and colored version for user
                 for line in clips_content.split('\n'):
                     if line.startswith('CLIP:'):
-                        print(line)
+                        print(line) # Raw for bash
+                        print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
+                    else:
+                        print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
 
         # Output timestamps for Bash to use for image extraction
         for seg in segments:
