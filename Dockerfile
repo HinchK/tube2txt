@@ -19,14 +19,10 @@ WORKDIR /app
 COPY src/ ./src/
 COPY pyproject.toml .
 COPY README.md .
-COPY tube2txt.sh .
 COPY styles.css .
 
 # Install the package
 RUN pip install --no-cache-dir .
-
-# Make scripts executable
-RUN chmod +x tube2txt.sh
 
 # Create output structure
 RUN mkdir -p /app/projects

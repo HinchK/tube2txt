@@ -18,4 +18,4 @@ services:
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     # Usage: docker-compose run tube2txt <slug> <url> --ai
-    entrypoint: /app/tube2txt.sh
+    entrypoint: tube2txt

@@ -50,14 +50,16 @@ docker-compose run tube2txt <project-name> <url> --ai
 
 ## Usage
 
-### 1. Process a Video (via CLI or Bash script)
+### 1. Process a Video
+
+The `tube2txt` command now handles the entire pipeline: downloading, transcript parsing, AI analysis, and screenshot extraction.
 
 ```bash
-# Using CLI (if installed via pip/pipx)
-tube2txt --vtt video.vtt --url "url" --slug project --ai
+# Simplest usage (slug defaults to 'default')
+tube2txt "https://www.youtube.com/watch?v=..." --ai
 
-# Using Bash script (Recommended - orchestrates yt-dlp, ffmpeg, and Python)
-./tube2txt.sh my-project "https://www.youtube.com/watch?v=..." --ai
+# Provide a custom project slug
+tube2txt my-project "https://www.youtube.com/watch?v=..." --ai --parallel 8
 ```
 
 Output goes to `projects/my-project/` with:
@@ -68,43 +70,37 @@ Output goes to `projects/my-project/` with:
 ### 2. Launch the Hub
 
 ```bash
-# Using CLI
 tube2txt-hub
-
-# Or using Bash script
-./tube2txt.sh hub
 ```
 
-The hub lets you browse all processed videos and search across every transcript.
+The hub lets you browse all processed videos and search across every transcript. Open `http://localhost:8000` in your browser.
 
 ### 3. Smart Clips
 
 - **AI Clipping** (Gemini picks the best moments):
   ```bash
-  ./tube2txt.sh my-project "url" --ai --mode clips
+  tube2txt my-project "url" --ai --mode clips
   ```
 - **Manual Clipping**:
   ```bash
-  ./tube2txt.sh clip my-project 00:01:00-00:02:30
+  tube2txt --clip 00:01:00-00:02:30 --video-file projects/my-project/video.mp4
   ```
 
 ### 4. Re-index Existing Projects
 
 ```bash
-# Using CLI
 tube2txt-index
-
-# Or using script manually
-python3 -m tube2txt.index_existing
 ```
 
 ### Options
 
 | Flag | Description |
 |---|---|
-| `--ai` | Generate AI content |
+| `--ai` | Generate AI content using Gemini |
 | `--mode <mode>` | AI mode: `outline` (default), `notes`, `recipe`, `technical`, `clips` |
-| `--parallel <N>` | Number of parallel `ffmpeg` processes (default: 4) |
+| `--parallel <N>` | Number of parallel `ffmpeg` processes for image extraction (default: 4) |
+| `--projects-dir <dir>` | Directory for output (default: `projects`) |
+| `--db <path>` | Path to SQLite DB (default: `tube2txt.db`) |
 
 ## Environment Variables
 
@@ -116,11 +112,15 @@ python3 -m tube2txt.index_existing
 ## Architecture
 
 ```
-tube2txt.sh             ← Bash entry point (orchestrates yt-dlp, ffmpeg, tube2txt)
 src/tube2txt/
-  ├─ __init__.py        ← Core Python worker (VTT, AI, HTML gen, DB indexing)
-  ├─ hub.py             ← FastAPI dashboard (browse + search)
-  └─ index_existing.py  ← Migration script for legacy projects
+  ├─ __init__.py        ← CLI entry point & Orchestrator
+  ├─ ai.py              ← Gemini API client & Prompts
+  ├─ db.py              ← SQLite & FTS5 indexing
+  ├─ downloader.py      ← yt-dlp wrapper
+  ├─ parsers.py         ← VTT transcript parser
+  ├─ generator.py       ← HTML generator
+  ├─ hub.py             ← FastAPI dashboard
+  └─ index_existing.py  ← Re-indexing logic
 styles.css              ← Copied into each project
 projects/               ← All generated output (gitignored)
 tube2txt.db             ← SQLite with FTS5 search index (gitignored)

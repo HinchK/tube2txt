@@ -38,24 +38,26 @@ Tube2Txt is a central intelligence platform that converts YouTube videos and pla
 
 ## Installation
 
-### Method 1: Local (macOS/Linux)
+### Method 1: Local (pip/pipx) - Recommended
 
-1. **Install System Dependencies**:
-   - `yt-dlp`, `ffmpeg`, `python3`
-   - ```bash
-     pip3 install google-genai python-dotenv fastapi uvicorn
-     ```
+You can install `tube2txt` as a package. This is the easiest way to use the CLI tools globally.
 
-2. **Configure API Key**:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your Gemini API key
-   ```
+```bash
+# Recommended for CLI apps
+pipx install .
 
-3. **Make Executable**:
-   ```bash
-   chmod +x tube2txt.sh
-   ```
+# Or using pip in a virtual environment
+pip install .
+```
+
+After installation, the following commands are available:
+- `tube2txt` - The main Python worker (for VTT parsing, AI generation, and DB indexing)
+- `tube2txt-hub` - Launches the Local Hub dashboard
+- `tube2txt-index` - Migrates or re-indexes existing projects
+
+### Method 2: Hybrid Bash/Python
+
+If you prefer to run the script directly from the repository, ensure you have installed the Python dependencies:
 
 ### Method 2: Docker
 
@@ -67,9 +69,13 @@ docker-compose run tube2txt <project-name> <url> --ai
 
 ## Usage
 
-### 1. Process a Video
+### 1. Process a Video (via CLI or Bash script)
 
 ```bash
+# Using CLI (if installed via pip/pipx)
+tube2txt --vtt video.vtt --url "url" --slug project --ai
+
+# Using Bash script (Recommended - orchestrates yt-dlp, ffmpeg, and Python)
 ./tube2txt.sh my-project "https://www.youtube.com/watch?v=..." --ai
 ```
 
@@ -81,8 +87,11 @@ Output goes to `projects/my-project/` with:
 ### 2. Launch the Hub
 
 ```bash
+# Using CLI
+tube2txt-hub
+
+# Or using Bash script
 ./tube2txt.sh hub
-# Open http://localhost:8000 in your browser
 ```
 
 The hub lets you browse all processed videos and search across every transcript.
@@ -100,10 +109,12 @@ The hub lets you browse all processed videos and search across every transcript.
 
 ### 4. Re-index Existing Projects
 
-If you have projects processed before v3 (or need to rebuild the search index):
-
 ```bash
-python3 index_existing.py
+# Using CLI
+tube2txt-index
+
+# Or using script manually
+python3 -m tube2txt.index_existing
 ```
 
 ### Options
@@ -124,13 +135,14 @@ python3 index_existing.py
 ## Architecture
 
 ```
-tube2txt.sh          ← Bash entry point (downloads, orchestrates)
-  └─ tube2txt.py     ← Python worker (VTT parsing, AI, HTML gen, DB indexing)
-hub.py               ← FastAPI dashboard (browse + search)
-index_existing.py    ← Migration script for legacy projects
-styles.css           ← Copied into each project
-projects/            ← All generated output (gitignored)
-tube2txt.db          ← SQLite with FTS5 search index (gitignored)
+tube2txt.sh             ← Bash entry point (orchestrates yt-dlp, ffmpeg, tube2txt)
+src/tube2txt/
+  ├─ __init__.py        ← Core Python worker (VTT, AI, HTML gen, DB indexing)
+  ├─ hub.py             ← FastAPI dashboard (browse + search)
+  └─ index_existing.py  ← Migration script for legacy projects
+styles.css              ← Copied into each project
+projects/               ← All generated output (gitignored)
+tube2txt.db             ← SQLite with FTS5 search index (gitignored)
 ```
 
 ## Features
