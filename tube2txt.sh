@@ -151,9 +151,6 @@ if ! command -v realpath &> /dev/null; then
 fi
 
 # Main logic
-mkdir -p OUTPUT
-pushd OUTPUT > /dev/null
-
 if [[ "$URL" == *"playlist?list="* ]] || [[ "$URL" == *"&list="* ]]; then
     echo "Playlist detected: $URL"
     PLAYLIST_NAME="$SLUG"
@@ -185,7 +182,5 @@ else
     fi
     process_video "$URL" "$SLUG"
 fi
-
-popd > /dev/null
 
 echo "All tasks complete!"
