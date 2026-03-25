@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /Users/hinchk/code/apps/TubedToText/src/tube2txt/*.py)",
+      "Bash(python3:*)"
+    ]
+  }
+}
