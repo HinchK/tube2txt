@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import tempfile
 import pytest
@@ -87,3 +88,29 @@ def test_search(client):
     data = response.json()
     assert len(data) >= 1
     assert data[0]["slug"] == "test-video"
+
+
+def test_websocket_process_sends_progress(client, test_env):
+    """WebSocket should stream progress messages during processing."""
+    with patch("tube2txt.hub.process_video") as mock_pv:
+        def fake_process(url, slug, mode, ai_flag, db_path, project_path, on_progress, parallel=4):
+            on_progress("status", "download", "Downloading...")
+            on_progress("status", "parse", "Parsing...")
+            on_progress("complete", "done", "Finished")
+            return project_path
+
+        mock_pv.side_effect = fake_process
+
+        with client.websocket_connect("/ws/process") as ws:
+            ws.send_json({"action": "start", "slug": "ws-test", "url": "https://youtube.com/watch?v=test", "ai": False, "mode": "outline"})
+
+            msgs = []
+            while True:
+                data = ws.receive_json()
+                msgs.append(data)
+                if data.get("type") in ("complete", "error"):
+                    break
+
+            types = [m["type"] for m in msgs]
+            assert "status" in types
+            assert "complete" in types

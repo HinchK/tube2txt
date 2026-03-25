@@ -1,12 +1,16 @@
 import os
 import re
+import json
 import sqlite3
+import asyncio
+import threading
 import uvicorn
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
+from tube2txt import process_video
 
 CWD = os.getcwd()
 DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
@@ -103,6 +107,62 @@ async def search(q: str = Query(...)):
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return results
+
+
+_job_lock = threading.Lock()
+_job_running = False
+
+
+@app.websocket("/ws/process")
+async def ws_process(websocket: WebSocket):
+    global _job_running
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_json()
+            if data.get("action") != "start":
+                continue
+
+            if not _job_lock.acquire(blocking=False):
+                await websocket.send_json({"type": "error", "message": "A job is already in progress"})
+                continue
+
+            _job_running = True
+            loop = asyncio.get_event_loop()
+
+            try:
+                slug = data["slug"]
+                url = data["url"]
+                ai_flag = data.get("ai", False)
+                mode = data.get("mode", "outline")
+                project_path = os.path.join(PROJECTS_DIR, slug)
+
+                def on_progress(type_, step, message):
+                    asyncio.run_coroutine_threadsafe(
+                        websocket.send_json({"type": type_, "step": step, "message": message}),
+                        loop,
+                    )
+
+                await loop.run_in_executor(
+                    None,
+                    lambda: process_video(
+                        url=url,
+                        slug=slug,
+                        mode=mode,
+                        ai_flag=ai_flag,
+                        db_path=DB_PATH,
+                        project_path=project_path,
+                        on_progress=on_progress,
+                    ),
+                )
+            except Exception as e:
+                await websocket.send_json({"type": "error", "message": str(e)})
+            finally:
+                _job_running = False
+                _job_lock.release()
+
+    except WebSocketDisconnect:
+        pass
 
 
 def start_hub():
