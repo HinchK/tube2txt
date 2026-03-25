@@ -5,6 +5,9 @@ import json
 import argparse
 import sqlite3
 import subprocess
+import glob as glob_module
+import shutil
+import concurrent.futures
 from datetime import datetime
 try:
     from dotenv import load_dotenv
@@ -266,6 +269,31 @@ Source: <a href="{self.video_url}" target="_blank">{self.video_url}</a>
 </html>"""
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
+
+def download_video(url, output_dir):
+    """Download video and subtitles using yt-dlp. Returns (video_file, vtt_file) or (None, None)."""
+    os.makedirs(output_dir, exist_ok=True)
+    cmd = [
+        "yt-dlp", "--no-warnings",
+        "--write-auto-subs", "--write-subs",
+        "-o", os.path.join(output_dir, "video.%(ext)s"),
+        url
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except Exception as e:
+        print(f"Error downloading: {e}")
+        return None, None
+
+    # Find downloaded files
+    video_files = glob_module.glob(os.path.join(output_dir, "video.*"))
+    video_files = [f for f in video_files if not f.endswith(".vtt")]
+    vtt_files = glob_module.glob(os.path.join(output_dir, "video.*.vtt"))
+
+    video = video_files[0] if video_files else None
+    vtt = vtt_files[0] if vtt_files else None
+    return video, vtt
+
 
 def main():
     parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
