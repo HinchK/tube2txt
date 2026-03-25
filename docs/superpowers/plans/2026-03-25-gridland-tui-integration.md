@@ -253,6 +253,8 @@ git commit -m "feat: add extract_images() with parallel ffmpeg execution"
 
 Extract all processing logic from `main()` into a reusable `process_video()` function with an optional `on_progress` callback.
 
+**Note:** This changes the CLI arg interface from `--slug`/`--url` flags to positional args (matching the spec's `tube2txt my-video "URL"` pattern). The old `--vtt` flag (skip download) is dropped since `process_video()` handles download internally. AI files now write to `project_path` instead of CWD — this is intentional per the spec.
+
 - [ ] **Step 2.1: Write the failing test**
 
 Append to `tests/test_process_video.py`:
@@ -725,6 +727,14 @@ async def search(q: str = Query(...)):
 
 def start_hub():
     """Entry point for the hub command."""
+    # Serve built TUI assets at root (if available)
+    tui_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tui-dist")
+    if not os.path.exists(tui_dist):
+        # Fallback for development: check CWD
+        tui_dist = os.path.join(CWD, "tui", "dist")
+    if os.path.exists(tui_dist):
+        app.mount("/", StaticFiles(directory=tui_dist, html=True), name="tui")
+
     print(f"Starting Tube2Txt API at http://localhost:8000")
     print(f"Database: {DB_PATH}")
     print(f"Projects: {PROJECTS_DIR}")
