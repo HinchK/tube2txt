@@ -323,24 +323,110 @@ def extract_images(video_path, segments, images_dir, parallel=4):
         concurrent.futures.wait(futures)
 
 
+def _notify(on_progress, type_, step, message):
+    """Send progress notification via callback or print."""
+    if on_progress:
+        on_progress(type_, step, message)
+    else:
+        print(message)
+
+
+def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db",
+                  project_path=None, on_progress=None, parallel=4):
+    """
+    Full video processing pipeline. Returns project_path on success, None on failure.
+
+    on_progress: optional callback (type: str, step: str, message: str) -> None
+    """
+    if project_path is None:
+        project_path = os.path.join("projects", slug)
+    os.makedirs(os.path.join(project_path, "images"), exist_ok=True)
+
+    # 1. Download
+    _notify(on_progress, "status", "download", "Downloading video and subtitles...")
+    video_file, vtt_file = download_video(url, project_path)
+    if not video_file or not vtt_file:
+        _notify(on_progress, "error", "download", f"Failed to download video or subtitles for {slug}")
+        return None
+
+    # 2. Parse VTT
+    _notify(on_progress, "status", "parse", "Parsing subtitles...")
+    parser = VTTParser(vtt_file)
+    segments = parser.parse()
+
+    # 3. Generate HTML
+    _notify(on_progress, "status", "html", "Generating HTML...")
+    html_gen = HTMLGenerator(segments, url, slug)
+    html_gen.generate(os.path.join(project_path, "index.html"))
+
+    # Copy styles.css
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    styles_src = os.path.join(pkg_dir, "styles.css")
+    if not os.path.exists(styles_src):
+        styles_src = os.path.join(os.path.dirname(os.path.dirname(pkg_dir)), "styles.css")
+    if os.path.exists(styles_src):
+        shutil.copy(styles_src, os.path.join(project_path, "styles.css"))
+
+    # 4. DB indexing
+    _notify(on_progress, "status", "index", f"Indexing video in database...")
+    db = Database(db_path)
+    db.index_video(slug, url, segments)
+
+    # 5. AI content
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if ai_flag and not api_key:
+        _notify(on_progress, "status", "ai", "Skipping AI -- GEMINI_API_KEY not set")
+    elif ai_flag and api_key:
+        client = GeminiClient(api_key)
+
+        _notify(on_progress, "status", "ai", "Generating outline...")
+        outline = client.generate_content(segments, mode="outline")
+        outline_path = os.path.join(project_path, "TUBE2TXT-OUTLINE.md")
+        with open(outline_path, "w", encoding="utf-8") as f:
+            f.write(outline)
+        _notify(on_progress, "ai_output", "ai", outline)
+
+        best_mode = client.determine_best_mode(outline)
+        _notify(on_progress, "status", "ai", f"Generating {best_mode} content...")
+        additional = client.generate_content(segments, mode=best_mode)
+        add_path = os.path.join(project_path, f"TUBE2TXT-{best_mode.upper()}.md")
+        with open(add_path, "w", encoding="utf-8") as f:
+            f.write(additional)
+        _notify(on_progress, "ai_output", "ai", additional)
+
+        if mode == "clips":
+            _notify(on_progress, "status", "ai", "Generating clips...")
+            clips = client.generate_content(segments, mode="clips")
+            clips_path = os.path.join(project_path, "TUBE2TXT-CLIPS.md")
+            with open(clips_path, "w", encoding="utf-8") as f:
+                f.write(clips)
+            _notify(on_progress, "ai_output", "ai", clips)
+
+    # 6. Extract images
+    _notify(on_progress, "status", "images", "Extracting images...")
+    extract_images(video_file, segments, os.path.join(project_path, "images"), parallel=parallel)
+
+    _notify(on_progress, "complete", "done", f"Finished processing {slug}")
+    return project_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
-    parser.add_argument("--vtt", help="Path to VTT file")
-    parser.add_argument("--url", help="YouTube video URL")
-    parser.add_argument("--slug", help="Project slug")
-    parser.add_argument("--output-html", help="Path to output HTML")
-    parser.add_argument("--output-outline", help="Path to output markdown content")
-    parser.add_argument("--mode", default="outline", help="Requested AI mode")
+    parser.add_argument("slug_or_url", nargs="?", help="Project slug or YouTube URL")
+    parser.add_argument("url", nargs="?", help="YouTube video URL (if slug provided)")
+    parser.add_argument("--vtt", help="Path to existing VTT file (skips download)")
     parser.add_argument("--ai", action="store_true", help="Run AI generation")
+    parser.add_argument("--mode", default="outline", help="Requested AI mode")
+    parser.add_argument("--parallel", type=int, default=4, help="Parallel image extraction")
     parser.add_argument("--db", default="tube2txt.db", help="Path to SQLite DB")
-    parser.add_argument("--clip", help="Extract a clip: START-END (HH:MM:SS-HH:MM:SS)")
-    parser.add_argument("--video-file", help="Path to video file for clipping")
-    
+    parser.add_argument("--projects-dir", default="projects", help="Directory for output")
+    parser.add_argument("--clip", help="Manual clip: START-END")
+    parser.add_argument("--video-file", help="Video file for manual clipping")
+
     args = parser.parse_args()
 
     # Manual Clipping
     if args.clip and args.video_file:
-        # Parse timestamps: "HH:MM:SS-HH:MM:SS" or "HH:MM:SS.mmm-HH:MM:SS.mmm"
         clip_match = re.match(r'^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)-(\d{2}:\d{2}:\d{2}(?:\.\d+)?)$', args.clip)
         if not clip_match:
             print(f"Error: Invalid clip range format '{args.clip}'. Expected HH:MM:SS-HH:MM:SS")
@@ -352,78 +438,30 @@ def main():
             print(f"CLIP_SAVED:clips/{output_name}")
         sys.exit(0)
 
-    if not args.url or not args.slug:
-        print("Error: Missing required arguments (URL and Slug).")
-        sys.exit(1)
+    # Resolve URL and slug
+    url = args.url
+    slug = args.slug_or_url
+    if not url:
+        if slug and (slug.startswith("http") or len(slug) == 11):
+            url = slug
+            slug = "default"
+        else:
+            print("Error: Missing URL.")
+            sys.exit(1)
 
-    if args.vtt:
-        vtt_parser = VTTParser(args.vtt)
-        segments = vtt_parser.parse()
+    project_path = os.path.join(args.projects_dir, slug)
+    result = process_video(
+        url=url,
+        slug=slug,
+        mode=args.mode,
+        ai_flag=args.ai,
+        db_path=args.db,
+        project_path=project_path,
+        parallel=args.parallel,
+    )
 
-        html_gen = HTMLGenerator(segments, args.url, args.slug)
-        html_gen.generate(args.output_html)
-
-        # DB Indexing
-        db = Database(args.db)
-        db.index_video(args.slug, args.url, segments)
-        print(f"Video indexed in DB: {args.db}")
-
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if args.ai and not api_key:
-            print("Warning: GEMINI_API_KEY not found. Skipping AI generation.")
-        
-        if api_key:
-            client = GeminiClient(api_key)
-            
-            # 1. Always generate the outline
-            print("\n--- GENERATING OUTLINE ---")
-            outline = client.generate_content(segments, mode='outline')
-            outline_path = f"TUBE2TXT-OUTLINE.md"
-            with open(outline_path, 'w', encoding='utf-8') as f:
-                f.write(outline)
-            
-            # Print outline in cyan
-            for line in outline.split('\n'):
-                print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
-            print(f"\nAI Outline saved at {outline_path}")
-
-            # 2. Determine best additional mode and generate it
-            best_mode = client.determine_best_mode(outline)
-            print(f"\n--- GENERATING ADDITIONAL CONTENT ({best_mode.upper()}) ---")
-            additional_content = client.generate_content(segments, mode=best_mode)
-            additional_path = f"TUBE2TXT-{best_mode.upper()}.md"
-            with open(additional_path, 'w', encoding='utf-8') as f:
-                f.write(additional_content)
-            
-            # Print additional content in cyan
-            for line in additional_content.split('\n'):
-                # In case additional mode generates clips (though unlikely with current logic)
-                if line.startswith('CLIP:'):
-                    print(line)
-                    print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
-                else:
-                    print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
-            print(f"\nAI {best_mode.capitalize()} saved at {additional_path}")
-
-            # 3. Special case for Clips if explicitly requested
-            if args.mode == 'clips':
-                print("\n--- GENERATING CLIPS ---")
-                clips_content = client.generate_content(segments, mode='clips')
-                clips_path = "TUBE2TXT-CLIPS.md"
-                with open(clips_path, 'w', encoding='utf-8') as f:
-                    f.write(clips_content)
-                
-                # For clips, print raw CLIP: for bash and colored version for user
-                for line in clips_content.split('\n'):
-                    if line.startswith('CLIP:'):
-                        print(line) # Raw for bash
-                        print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
-                    else:
-                        print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
-
-        # Output timestamps for Bash to use for image extraction
-        for seg in segments:
-            print(f"TIMESTAMP:{seg['start']}")
+    if result:
+        print(f"\nProject: {os.path.abspath(result)}")
 
 if __name__ == "__main__":
     main()
