@@ -295,6 +295,34 @@ def download_video(url, output_dir):
     return video, vtt
 
 
+def _extract_single_image(video_path, ts, output_path):
+    """Extract a single frame using ffmpeg."""
+    cmd = [
+        "ffmpeg", "-ss", ts, "-nostdin", "-i", video_path,
+        "-frames:v", "1", "-q:v", "2", "-vf", "scale=1024:-1",
+        output_path, "-loglevel", "error", "-y"
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        return True
+    except Exception:
+        return False
+
+
+def extract_images(video_path, segments, images_dir, parallel=4):
+    """Extract screenshot images for each segment in parallel using ffmpeg."""
+    os.makedirs(images_dir, exist_ok=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+        futures = []
+        for seg in segments:
+            ts = seg["start"]
+            ts_filename = ts.replace(":", "-").replace(".", "-")
+            img_path = os.path.join(images_dir, f"{ts_filename}.jpg")
+            if not os.path.exists(img_path):
+                futures.append(executor.submit(_extract_single_image, video_path, ts, img_path))
+        concurrent.futures.wait(futures)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
     parser.add_argument("--vtt", help="Path to VTT file")
