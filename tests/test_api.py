@@ -114,3 +114,57 @@ def test_websocket_process_sends_progress(client, test_env):
             types = [m["type"] for m in msgs]
             assert "status" in types
             assert "complete" in types
+
+
+def test_integration_process_and_fetch(test_env):
+    """Full flow: process via WebSocket, then fetch via REST."""
+    with patch.dict(os.environ, {"TUBE2TXT_DB": test_env["db_path"]}):
+        import tube2txt.hub as hub_module
+        hub_module.DB_PATH = test_env["db_path"]
+        hub_module.PROJECTS_DIR = test_env["projects_dir"]
+
+        from fastapi.testclient import TestClient
+        test_client = TestClient(hub_module.app)
+
+        with patch("tube2txt.hub.process_video") as mock_pv:
+            slug = "integration-test"
+
+            def fake_process(**kwargs):
+                # Simulate creating project artifacts
+                project_path = kwargs["project_path"]
+                os.makedirs(project_path, exist_ok=True)
+                with open(os.path.join(project_path, "TUBE2TXT-OUTLINE.md"), "w") as f:
+                    f.write("# Test Outline")
+
+                # Seed DB
+                conn = sqlite3.connect(test_env["db_path"])
+                conn.execute("INSERT OR REPLACE INTO videos (slug, url, title, processed_at) VALUES (?, ?, ?, ?)",
+                             (slug, "https://test.com", "Integration Test", "2026-03-25"))
+                conn.commit()
+                conn.close()
+
+                cb = kwargs["on_progress"]
+                cb("status", "download", "Downloading...")
+                cb("complete", "done", "Done")
+                return project_path
+
+            mock_pv.side_effect = fake_process
+
+            # 1. Process via WebSocket
+            with test_client.websocket_connect("/ws/process") as ws:
+                ws.send_json({"action": "start", "slug": slug, "url": "https://test.com", "ai": False, "mode": "outline"})
+                msgs = []
+                while True:
+                    data = ws.receive_json()
+                    msgs.append(data)
+                    if data["type"] in ("complete", "error"):
+                        break
+                assert msgs[-1]["type"] == "complete"
+
+            # 2. Fetch via REST
+            res = test_client.get(f"/api/videos/{slug}")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["slug"] == slug
+            assert len(data["ai_files"]) == 1
+            assert data["ai_files"][0]["name"] == "OUTLINE"
