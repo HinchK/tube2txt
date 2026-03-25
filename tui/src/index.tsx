@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Box, Text } from "@opentui/react";
-import { render } from "@gridland/core";
+import { createCliRenderer, createRoot } from "@gridland/core";
 import { ProcessScreen } from "./screens/ProcessScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { SearchScreen } from "./screens/SearchScreen";
@@ -19,29 +18,34 @@ function App() {
   };
 
   return (
-    <Box flexDirection="column" width="100%">
+    <box flexDirection="column" width="100%">
       {/* Navigation bar */}
-      <Box paddingX={1} borderStyle="single" borderBottom>
-        <Text bold color="cyan">tube2txt</Text>
-        <Text>  </Text>
-        <Text inverse={screen === "process"} onClick={() => setScreen("process")}> [1] Process </Text>
-        <Text inverse={screen === "dashboard"} onClick={() => setScreen("dashboard")}> [2] Dashboard </Text>
-        <Text inverse={screen === "search"} onClick={() => setScreen("search")}> [3] Search </Text>
-        <Box flexGrow={1} />
-        <Text dimColor>ws: {wsStatus}</Text>
-      </Box>
+      <box paddingX={1} borderStyle="single">
+        <text bold color="cyan">tube2txt</text>
+        <text>  </text>
+        <text inverse={screen === "process"} onClick={() => setScreen("process")}> [1] Process </text>
+        <text inverse={screen === "dashboard"} onClick={() => setScreen("dashboard")}> [2] Dashboard </text>
+        <text inverse={screen === "search"} onClick={() => setScreen("search")}> [3] Search </text>
+        <box flexGrow={1} />
+        <text dimColor>ws: {wsStatus}</text>
+      </box>
 
       {/* Screen content */}
-      <Box flexGrow={1} padding={1}>
+      <box flexGrow={1} padding={1}>
         {screen === "process" && <ProcessScreen onWsStatusChange={setWsStatus} />}
         {screen === "dashboard" && <DashboardScreen onSelectVideo={navigateToDetail} />}
         {screen === "search" && <SearchScreen onSelectResult={navigateToDetail} />}
         {screen === "detail" && selectedSlug && (
           <VideoDetailScreen slug={selectedSlug} onBack={() => setScreen("dashboard")} />
         )}
-      </Box>
-    </Box>
+      </box>
+    </box>
   );
 }
 
-render(<App />);
+async function main() {
+  const renderer = await createCliRenderer();
+  createRoot(renderer).render(<App />);
+}
+
+main();
