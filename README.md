@@ -4,6 +4,16 @@
 
 Tube2Txt converts YouTube videos into structured web pages with transcripts, screenshots, and AI-assisted analysis. It ships with a **Gridland TUI dashboard** and a headless **FastAPI + WebSocket API**.
 
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/deploy?repo=https://github.com/HinchK/tube2txt)
+
+**Post-Deployment Setup:**
+1. Provide your `GEMINI_API_KEY` when prompted by Railway (get one free at [Google AI Studio](https://aistudio.google.com/)).
+2. Once the service is live, open the generated Railway URL to access the hub.
+3. To process your first video via the Railway CLI:
+   ```bash
+   railway run tube2txt my-video-slug "https://youtube.com/watch?v=..." --ai
+   ```
+
 ## Features
 
 - **Gridland TUI**: Terminal dashboard built with Bun + OpenTUI + React — process videos, browse your library, and search transcripts, all from the terminal.
@@ -192,6 +202,7 @@ tube2txt-index
 |---|---|---|
 | `GEMINI_API_KEY` | Google Gemini API key (required for `--ai`) | — |
 | `TUBE2TXT_DB` | Path to the SQLite database file | `tube2txt.db` in CWD |
+| `PORT` | Port the hub server listens on | `8000` |
 
 ## Running Tests
 
