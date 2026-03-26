@@ -15,6 +15,13 @@ try:
 except ImportError:
     pass
 
+from .db import Database
+from .parsers import VTTParser
+from .generator import HTMLGenerator
+from .ai import GeminiClient
+from .downloader import Downloader
+from .clipping import ClippingEngine
+
 # Constants for terminal coloring
 CLI_COLOR_CYAN = "\033[36m"
 CLI_COLOR_RESET = "\033[0m"
