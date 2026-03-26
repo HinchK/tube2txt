@@ -1,3 +1,5 @@
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/deploy?repo=https://github.com/HinchK/tube2txt)
+
 # Tube2Txt v3.1
 
 > **Inspiration:** This project is a modern rewrite of the original [Youtube2Webpage](https://github.com/obra/Youtube2Webpage) script.
@@ -7,6 +9,7 @@ Tube2Txt converts YouTube videos into structured web pages with transcripts, scr
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/deploy?repo=https://github.com/HinchK/tube2txt)
 
 **Post-Deployment Setup:**
+
 1. Provide your `GEMINI_API_KEY` when prompted by Railway (get one free at [Google AI Studio](https://aistudio.google.com/)).
 2. Once the service is live, open the generated Railway URL to access the hub.
 3. To process your first video via the Railway CLI:
@@ -20,7 +23,7 @@ Tube2Txt converts YouTube videos into structured web pages with transcripts, scr
 - **WebSocket Processing**: Real-time progress streaming via `/ws/process` — the TUI connects here to show live logs.
 - **REST API**: Full JSON API for video listing, detail, image serving, and FTS5 search.
 - **AI Analysis**: Gemini-powered outlines, notes, recipes, technical summaries, and smart clip extraction.
-- **AI Voice by Strunk & White**: AI-generated content follows *The Elements of Style* (1918) for concise, active writing.
+- **AI Voice by Strunk & White**: AI-generated content follows _The Elements of Style_ (1918) for concise, active writing.
 - **FTS5 Global Search**: Search any word or phrase across all processed videos.
 - **Smart Clips**: Manual or AI-driven video segment extraction.
 - **Parallel Screenshot Extraction**: Up to 10x faster via `ThreadPoolExecutor` + ffmpeg.
@@ -55,6 +58,7 @@ tube2txt.db             ← SQLite database (gitignored)
 We've included a standalone React component that provides a "Gridland" inspired terminal experience for showcasing `tube2txt` on the web.
 
 ### Features
+
 - **CRT Effect**: Authentic scanlines, flicker, and glow.
 - **Simulated CLI**: Interactive typing demo showing the `--ai` pipeline.
 - **TUI Grid**: Terminal-style feature showcase using box-drawing aesthetics.
@@ -63,12 +67,14 @@ Integration
 Copy `tui/src/components/Tube2TxtShowcase.tsx` into your React/Next.js project. It requires **Tailwind CSS**.
 
 ```tsx
-import Tube2TxtShowcase from './components/Tube2TxtShowcase';
+import Tube2TxtShowcase from "./components/Tube2TxtShowcase";
 ```
+
 export default function Page() {
-  return <Tube2TxtShowcase />;
+return <Tube2TxtShowcase />;
 }
-```
+
+````
 
 ## API Endpoints
 
@@ -92,7 +98,7 @@ Send a JSON message to start processing:
   "ai": true,
   "mode": "outline"
 }
-```
+````
 
 The server streams back `{"type": "...", "step": "...", "message": "..."}` events.
 
@@ -120,11 +126,11 @@ pip install .
 
 After installation, three commands are available:
 
-| Command | Description |
-|---|---|
-| `tube2txt` | Main Python worker (VTT parsing, AI generation, DB indexing) |
-| `tube2txt-hub` | Starts the API server + serves the TUI dashboard |
-| `tube2txt-index` | Migrates or re-indexes existing projects |
+| Command          | Description                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| `tube2txt`       | Main Python worker (VTT parsing, AI generation, DB indexing) |
+| `tube2txt-hub`   | Starts the API server + serves the TUI dashboard             |
+| `tube2txt-index` | Migrates or re-indexes existing projects                     |
 
 ### Method 3: Docker
 
@@ -144,12 +150,12 @@ tube2txt my-video "https://www.youtube.com/watch?v=..." --ai --mode notes
 
 Output goes to `projects/my-video/`:
 
-| File | Description |
-|---|---|
-| `index.html` | Transcript page with timestamped screenshots |
-| `images/` | Extracted video frames |
-| `TUBE2TXT-OUTLINE.md` | AI outline (when `--ai` is used) |
-| `TUBE2TXT-NOTES.md` | AI notes (when `--mode notes`) |
+| File                  | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `index.html`          | Transcript page with timestamped screenshots |
+| `images/`             | Extracted video frames                       |
+| `TUBE2TXT-OUTLINE.md` | AI outline (when `--ai` is used)             |
+| `TUBE2TXT-NOTES.md`   | AI notes (when `--mode notes`)               |
 
 ### Launch the Hub + TUI
 
@@ -190,19 +196,19 @@ tube2txt-index
 
 ## Options
 
-| Flag | Description |
-|---|---|
-| `--ai` | Generate AI content via Gemini |
-| `--mode <mode>` | AI mode: `outline` (default), `notes`, `recipe`, `technical`, `clips` |
-| `--parallel <N>` | Parallel ffmpeg processes for screenshot extraction (default: 4) |
+| Flag             | Description                                                           |
+| ---------------- | --------------------------------------------------------------------- |
+| `--ai`           | Generate AI content via Gemini                                        |
+| `--mode <mode>`  | AI mode: `outline` (default), `notes`, `recipe`, `technical`, `clips` |
+| `--parallel <N>` | Parallel ffmpeg processes for screenshot extraction (default: 4)      |
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `GEMINI_API_KEY` | Google Gemini API key (required for `--ai`) | — |
-| `TUBE2TXT_DB` | Path to the SQLite database file | `tube2txt.db` in CWD |
-| `PORT` | Port the hub server listens on | `8000` |
+| Variable         | Description                                 | Default              |
+| ---------------- | ------------------------------------------- | -------------------- |
+| `GEMINI_API_KEY` | Google Gemini API key (required for `--ai`) | —                    |
+| `TUBE2TXT_DB`    | Path to the SQLite database file            | `tube2txt.db` in CWD |
+| `PORT`           | Port the hub server listens on              | `8000`               |
 
 ## Running Tests
 
