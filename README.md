@@ -49,12 +49,12 @@ We've included a standalone React component that provides a "Gridland" inspired 
 - **Simulated CLI**: Interactive typing demo showing the `--ai` pipeline.
 - **TUI Grid**: Terminal-style feature showcase using box-drawing aesthetics.
 
-### Integration
-Copy `src/components/Tube2TxtShowcase.tsx` into your React/Next.js project. It requires **Tailwind CSS**.
+Integration
+Copy `tui/src/components/Tube2TxtShowcase.tsx` into your React/Next.js project. It requires **Tailwind CSS**.
 
 ```tsx
 import Tube2TxtShowcase from './components/Tube2TxtShowcase';
-
+```
 export default function Page() {
   return <Tube2TxtShowcase />;
 }
