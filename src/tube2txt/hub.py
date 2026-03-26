@@ -30,8 +30,8 @@ app.add_middleware(
 Database(DB_PATH)
 
 
-@app.get("/healthz")
-async def healthz():
+@app.get("/healthcheck")
+async def healthcheck():
     return {"status": "ok"}
 
 
