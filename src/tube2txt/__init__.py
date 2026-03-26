@@ -5,14 +5,10 @@ import argparse
 import glob
 import shutil
 import subprocess
+import glob as glob_module
+import shutil
 import concurrent.futures
-from .db import Database
-from .clipping import ClippingEngine
-from .ai import GeminiClient
-from .parsers import VTTParser
-from .generator import HTMLGenerator
-from .downloader import Downloader
-
+from datetime import datetime
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -149,8 +145,148 @@ def process_video_logic(url, slug, mode, ai_flag, db_path, parallel, projects_di
     print(f"Finished: {slug}")
     return project_path
 
+def download_video(url, output_dir):
+    """Download video and subtitles using yt-dlp. Returns (video_file, vtt_file) or (None, None)."""
+    os.makedirs(output_dir, exist_ok=True)
+    cmd = [
+        "yt-dlp", "--no-warnings",
+        "--write-auto-subs", "--write-subs",
+        "-o", os.path.join(output_dir, "video.%(ext)s"),
+        url
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except Exception as e:
+        print(f"Error downloading: {e}")
+        return None, None
+
+    # Find downloaded files
+    video_files = glob_module.glob(os.path.join(output_dir, "video.*"))
+    video_files = [f for f in video_files if not f.endswith(".vtt")]
+    vtt_files = glob_module.glob(os.path.join(output_dir, "video.*.vtt"))
+
+    video = video_files[0] if video_files else None
+    vtt = vtt_files[0] if vtt_files else None
+    return video, vtt
+
+
+def _extract_single_image(video_path, ts, output_path):
+    """Extract a single frame using ffmpeg."""
+    cmd = [
+        "ffmpeg", "-ss", ts, "-nostdin", "-i", video_path,
+        "-frames:v", "1", "-q:v", "2", "-vf", "scale=1024:-1",
+        output_path, "-loglevel", "error", "-y"
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        return True
+    except Exception:
+        return False
+
+
+def extract_images(video_path, segments, images_dir, parallel=4):
+    """Extract screenshot images for each segment in parallel using ffmpeg."""
+    os.makedirs(images_dir, exist_ok=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+        futures = []
+        for seg in segments:
+            ts = seg["start"]
+            ts_filename = ts.replace(":", "-").replace(".", "-")
+            img_path = os.path.join(images_dir, f"{ts_filename}.jpg")
+            if not os.path.exists(img_path):
+                futures.append(executor.submit(_extract_single_image, video_path, ts, img_path))
+        concurrent.futures.wait(futures)
+
+
+def _notify(on_progress, type_, step, message):
+    """Send progress notification via callback or print."""
+    if on_progress:
+        on_progress(type_, step, message)
+    else:
+        print(message)
+
+
+def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db",
+                  project_path=None, on_progress=None, parallel=4):
+    """
+    Full video processing pipeline. Returns project_path on success, None on failure.
+
+    on_progress: optional callback (type: str, step: str, message: str) -> None
+    """
+    if project_path is None:
+        project_path = os.path.join("projects", slug)
+    os.makedirs(os.path.join(project_path, "images"), exist_ok=True)
+
+    # 1. Download
+    _notify(on_progress, "status", "download", "Downloading video and subtitles...")
+    video_file, vtt_file = download_video(url, project_path)
+    if not video_file or not vtt_file:
+        _notify(on_progress, "error", "download", f"Failed to download video or subtitles for {slug}")
+        return None
+
+    # 2. Parse VTT
+    _notify(on_progress, "status", "parse", "Parsing subtitles...")
+    parser = VTTParser(vtt_file)
+    segments = parser.parse()
+
+    # 3. Generate HTML
+    _notify(on_progress, "status", "html", "Generating HTML...")
+    html_gen = HTMLGenerator(segments, url, slug)
+    html_gen.generate(os.path.join(project_path, "index.html"))
+
+    # Copy styles.css
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    styles_src = os.path.join(pkg_dir, "styles.css")
+    if not os.path.exists(styles_src):
+        styles_src = os.path.join(os.path.dirname(os.path.dirname(pkg_dir)), "styles.css")
+    if os.path.exists(styles_src):
+        shutil.copy(styles_src, os.path.join(project_path, "styles.css"))
+
+    # 4. DB indexing
+    _notify(on_progress, "status", "index", f"Indexing video in database...")
+    db = Database(db_path)
+    db.index_video(slug, url, segments)
+
+    # 5. AI content
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if ai_flag and not api_key:
+        _notify(on_progress, "status", "ai", "Skipping AI -- GEMINI_API_KEY not set")
+    elif ai_flag and api_key:
+        client = GeminiClient(api_key)
+
+        _notify(on_progress, "status", "ai", "Generating outline...")
+        outline = client.generate_content(segments, mode="outline")
+        outline_path = os.path.join(project_path, "TUBE2TXT-OUTLINE.md")
+        with open(outline_path, "w", encoding="utf-8") as f:
+            f.write(outline)
+        _notify(on_progress, "ai_output", "ai", outline)
+
+        best_mode = client.determine_best_mode(outline)
+        _notify(on_progress, "status", "ai", f"Generating {best_mode} content...")
+        additional = client.generate_content(segments, mode=best_mode)
+        add_path = os.path.join(project_path, f"TUBE2TXT-{best_mode.upper()}.md")
+        with open(add_path, "w", encoding="utf-8") as f:
+            f.write(additional)
+        _notify(on_progress, "ai_output", "ai", additional)
+
+        if mode == "clips":
+            _notify(on_progress, "status", "ai", "Generating clips...")
+            clips = client.generate_content(segments, mode="clips")
+            clips_path = os.path.join(project_path, "TUBE2TXT-CLIPS.md")
+            with open(clips_path, "w", encoding="utf-8") as f:
+                f.write(clips)
+            _notify(on_progress, "ai_output", "ai", clips)
+
+    # 6. Extract images
+    _notify(on_progress, "status", "images", "Extracting images...")
+    extract_images(video_file, segments, os.path.join(project_path, "images"), parallel=parallel)
+
+    _notify(on_progress, "complete", "done", f"Finished processing {slug}")
+    return project_path
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Tube2Txt CLI")
+    parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
     parser.add_argument("slug_or_url", nargs="?", help="Project slug or YouTube URL")
     parser.add_argument("url", nargs="?", help="YouTube video URL (if slug provided)")
     parser.add_argument("--vtt", help="Path to existing VTT file (skips download)")
@@ -161,7 +297,7 @@ def main():
     parser.add_argument("--projects-dir", default="projects", help="Directory for output")
     parser.add_argument("--clip", help="Manual clip: START-END")
     parser.add_argument("--video-file", help="Video file for manual clipping")
-    
+
     args = parser.parse_args()
 
     # Manual Clipping
@@ -177,12 +313,10 @@ def main():
             print(f"CLIP_SAVED:clips/{output_name}")
         sys.exit(0)
 
-    # Normal processing
+    # Resolve URL and slug
     url = args.url
     slug = args.slug_or_url
-    
     if not url:
-        # If only one positional arg, it might be the URL
         if slug and (slug.startswith("http") or len(slug) == 11):
             url = slug
             slug = "default"
@@ -190,40 +324,19 @@ def main():
             print("Error: Missing URL.")
             sys.exit(1)
 
-    # Identify styles.css location (it's in the same dir as the script normally)
-    pkg_dir = os.path.dirname(os.path.abspath(__file__))
-    # styles.css might be in the root of the repo if running from source, 
-    # or installed with the package.
-    styles_css = os.path.join(pkg_dir, "styles.css")
-    if not os.path.exists(styles_css):
-        # Fallback to root dir if running from src/tube2txt
-        styles_css = os.path.join(os.path.dirname(os.path.dirname(pkg_dir)), "styles.css")
+    project_path = os.path.join(args.projects_dir, slug)
+    result = process_video(
+        url=url,
+        slug=slug,
+        mode=args.mode,
+        ai_flag=args.ai,
+        db_path=args.db,
+        project_path=project_path,
+        parallel=args.parallel,
+    )
 
-    # Playlist detection
-    if "playlist?list=" in url or "&list=" in url:
-        print(f"Playlist detected: {url}")
-        playlist_videos = Downloader.get_playlist_videos(url)
-        artifact_paths = []
-        for vid_id, vid_title in playlist_videos:
-            clean_title = re.sub(r'[^a-zA-Z0-9]', '_', vid_title)[:50]
-            v_url = f"https://www.youtube.com/watch?v={vid_id}"
-            path = process_video_logic(v_url, clean_title, args.mode, args.ai, args.db, args.parallel, args.projects_dir, styles_css)
-            if path: artifact_paths.append(path)
-    else:
-        path = process_video_logic(url, slug, args.mode, args.ai, args.db, args.parallel, args.projects_dir, styles_css)
-        artifact_paths = [path] if path else []
-
-    if artifact_paths:
-        print("\n--- GENERATED ARTIFACTS ---")
-        for p in artifact_paths:
-            print(f"Project: {os.path.abspath(p)}")
-            for f in glob.glob(os.path.join(p, "*")):
-                if os.path.isfile(f):
-                    print(f"  - {os.path.abspath(f)}")
-            if os.path.exists(os.path.join(p, "images")):
-                print(f"  - {os.path.abspath(os.path.join(p, 'images'))}/")
-            if os.path.exists(os.path.join(p, "clips")):
-                print(f"  - {os.path.abspath(os.path.join(p, 'clips'))}/")
+    if result:
+        print(f"\nProject: {os.path.abspath(result)}")
 
 if __name__ == "__main__":
     main()

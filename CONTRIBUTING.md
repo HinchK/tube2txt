@@ -1,22 +1,53 @@
 # Contributing to Tube2Txt
 
-Thank you for your interest in improving Tube2Txt! We welcome contributions from the community.
+## Development Setup
 
-## How to Contribute
+```bash
+git clone <repo-url>
+cd TubedToText
 
-1. **Fork the Repository**: Create your own fork of the project.
-2. **Clone the Fork**: Clone your fork to your local machine.
-3. **Create a Branch**: Create a new branch for your feature or bug fix.
-4. **Make Changes**: Implement your changes, following the existing code style.
-5. **Test Your Changes**: Ensure your changes work as expected and don't introduce regressions.
-6. **Commit Your Changes**: Use clear and concise commit messages.
-7. **Push to Your Fork**: Push your branch to your GitHub fork.
-8. **Submit a Pull Request**: Open a pull request against the main repository.
+# Python backend
+uv pip install -e "."
+uv pip install pytest httpx
+
+# Gridland TUI (optional)
+cd tui && bun install
+```
+
+## Project Structure
+
+```
+src/tube2txt/        ← Python package (core, hub, indexer)
+tui/src/             ← Gridland TUI (Bun + OpenTUI + React)
+tests/               ← pytest integration tests
+```
+
+## Key Conventions
+
+- **Python deps**: The system pip is PEP 668 blocked — always use `uv pip`.
+- **After editing `src/tube2txt/__init__.py`**: Run `uv pip install -e "."` before running tests so new exports are visible.
+- **TUI components**: Use lowercase JSX intrinsics (`<box>`, `<text>`, `<input>`, `<select>`, `<scrollbox>`) per the OpenTUI API — never PascalCase.
+- **TUI build target**: `bun build --target bun` is required because OpenTUI uses `bun:ffi` internally.
+- **`select` component**: Takes `options: [{label, value}]` and `onChange: (index) => void` — not `items`/`value` props.
+- **Gridland renderer**: `const renderer = await createCliRenderer(); createRoot(renderer).render(<App />)` — not a bare `render()` call.
+
+## Running Tests
+
+```bash
+.venv/bin/pytest tests/ -v
+```
+
+## Submitting Changes
+
+1. Fork the repository and create a feature branch.
+2. Make changes following the conventions above.
+3. Run the test suite and confirm it passes.
+4. Open a pull request with a clear description of what changed and why.
 
 ## Reporting Issues
 
-If you find a bug or have a feature request, please open an issue on the GitHub repository. Provide as much detail as possible, including steps to reproduce the issue.
+Open a GitHub issue with steps to reproduce, expected behavior, and actual behavior.
 
 ## Code of Conduct
 
-Please be respectful and professional in all your interactions with the project and its community.
+Be respectful and professional in all interactions.

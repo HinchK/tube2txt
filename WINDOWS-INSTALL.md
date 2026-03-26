@@ -1,74 +1,110 @@
-# Windows Installation Guide for Tube2Txt
+# Windows Installation Guide
 
-This guide outlines how to set up and run Tube2Txt on a Microsoft Windows environment.
+This guide covers running Tube2Txt on Windows. The recommended path is **WSL** or **Git Bash**. Native PowerShell is supported for dependency installation.
 
 ## Prerequisites
 
-To run this tool on Windows, you will need the following components installed and added to your system's PATH.
+### 1. Python 3.9+
 
-### 1. Install Python 3
-1. Download the latest Python installer from [python.org](https://www.python.org/downloads/windows/).
-2. **CRITICAL:** During installation, ensure you check the box that says **"Add Python to PATH"**.
-3. After installation, open PowerShell and verify:
+1. Download from [python.org](https://www.python.org/downloads/windows/).
+2. During installation, check **"Add Python to PATH"**.
+3. Verify:
    ```powershell
    python --version
    pip --version
    ```
 
-### 2. Install FFmpeg
-1. Download a "release build" from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) (e.g., `ffmpeg-release-essentials.7z`).
-2. Extract the folder to a permanent location (e.g., `C:\ffmpeg`).
-3. Add the `bin` folder (e.g., `C:\ffmpeg\bin`) to your System Environment Variables (PATH).
-4. Verify in PowerShell:
+### 2. FFmpeg
+
+1. Download a release build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) (e.g. `ffmpeg-release-essentials.7z`).
+2. Extract to a permanent location (e.g. `C:\ffmpeg`).
+3. Add `C:\ffmpeg\bin` to your System PATH.
+4. Verify:
    ```powershell
    ffmpeg -version
    ```
 
-### 3. Install yt-dlp
+### 3. yt-dlp
+
 1. Download `yt-dlp.exe` from the [latest release](https://github.com/yt-dlp/yt-dlp/releases).
-2. Move it to a folder in your PATH (or the same folder as FFmpeg).
-3. Verify in PowerShell:
+2. Place it in a folder already on your PATH (e.g. `C:\ffmpeg\bin`).
+3. Verify:
    ```powershell
    yt-dlp --version
    ```
 
-### 4. Install Git Bash (Recommended)
-Since `tube2txt.sh` is a shell script, the easiest way to run it on Windows is using **Git Bash**, which comes with [Git for Windows](https://gitforwindows.org/).
+### 4. Bun (for TUI development only)
 
-Alternatively, you can use **WSL (Windows Subsystem for Linux)**.
+If you want to run or build the Gridland TUI:
+
+1. Install from [bun.sh](https://bun.sh/) — run the PowerShell installer or `winget install Oven-sh.Bun`.
+2. Verify:
+   ```powershell
+   bun --version
+   ```
+
+### 5. Git Bash or WSL (Recommended)
+
+The CLI tools work on native Windows, but Git Bash or WSL give you a Unix shell for a smoother experience.
+
+- **Git Bash**: Install with [Git for Windows](https://gitforwindows.org/).
+- **WSL**: Run `wsl --install` in PowerShell (requires Windows 10 1903+ or Windows 11).
 
 ## Project Setup
 
-1. Open Git Bash and navigate to where you want the project:
-   ```bash
-   cd /c/users/yourname/projects
-   git clone <your-repo-url>
-   cd TubedToText
-   ```
-2. Install Python dependencies:
-   ```bash
-   pip install google-genai python-dotenv fastapi uvicorn
-   ```
-3. (Optional) Set up your API key:
-   ```bash
-   cp .env.example .env
-   # Edit .env with Notepad and add your key
-   ```
+### Option A: Git Bash / WSL
 
-## Running the tool
+```bash
+cd /c/users/yourname/projects   # Git Bash path style
+git clone <your-repo-url>
+cd TubedToText
 
-In Git Bash:
+# Install Python deps (use uv if available, otherwise pip)
+pip install -e "."
+
+# Copy and fill in your Gemini API key
+cp .env.example .env
+notepad .env
+```
+
+### Option B: PowerShell / Command Prompt
+
+```powershell
+cd C:\Users\yourname\projects
+git clone <your-repo-url>
+cd TubedToText
+
+pip install -e "."
+
+copy .env.example .env
+notepad .env
+```
+
+## Running
+
 ```bash
 # Process a video
-./tube2txt.sh my-project "video-id-or-url" --ai --mode notes --parallel 4
+tube2txt my-project "https://www.youtube.com/watch?v=..." --ai --mode notes
 
-# Launch the hub dashboard
-./tube2txt.sh hub
+# Start the API server + TUI dashboard
+tube2txt-hub
 # Open http://localhost:8000 in your browser
 ```
 
----
+## TUI (Optional)
+
+```bash
+cd tui
+bun install
+bun run dev        # development
+bun run build      # production build (output: tui/dist/)
+```
 
 ## Troubleshooting
-- **Command Not Found**: Ensure you restarted your terminal after adding items to the PATH.
-- **Permission Denied**: Try running Git Bash as an Administrator or ensure the script is executable: `chmod +x tube2txt.sh`.
+
+| Problem | Fix |
+|---|---|
+| `command not found` | Restart terminal after adding items to PATH |
+| `Permission denied` on script | Run Git Bash as Administrator, or `chmod +x tube2txt.sh` |
+| `ModuleNotFoundError` | Run `pip install -e "."` from the project root |
+| Bun not found in WSL | Install Bun inside WSL separately: `curl -fsSL https://bun.sh/install \| bash` |

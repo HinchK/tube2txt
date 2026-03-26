@@ -1,66 +1,79 @@
-# Tube2Txt v3
+# AI Assistant Guide for Tube2Txt
 
-CLI tool that converts YouTube videos/playlists into structured web pages with transcripts, screenshots, and AI-generated markdown analysis. Includes a local hub dashboard and smart clip extraction.
+## Project Context
+
+**Name:** Tube2Txt
+**Purpose:** Convert YouTube videos into structured web pages with transcripts, screenshots, and AI-assisted markdown analysis. Includes a Gridland TUI dashboard and headless FastAPI API with WebSocket support.
+**Tech Stack:** Python 3.9+, FastAPI, WebSockets, SQLite/FTS5, Bun, Gridland/OpenTUI, React, TypeScript
+
+## Architecture
+
+### Python Backend (`src/tube2txt/`)
+- `__init__.py` — Domain classes (Database, ClippingEngine, GeminiClient, VTTParser, HTMLGenerator) + `download_video()`, `extract_images()`, `process_video()`, `main()` CLI
+- `hub.py` — FastAPI headless JSON API: REST endpoints + WebSocket `/ws/process` for real-time processing
+- `index_existing.py` — Migration script for legacy projects
+
+### Gridland TUI (`tui/`)
+- `src/index.tsx` — App entry, screen router with navigation bar
+- `src/hooks/` — `useWebSocket.ts`, `useVideos.ts`, `useSearch.ts`
+- `src/screens/` — ProcessScreen, DashboardScreen, VideoDetailScreen, SearchScreen
+- `src/components/` — TerminalLog, VideoCard, SearchResult
+
+### Key Files
+- `pyproject.toml` — Python package config, entry points: `tube2txt`, `tube2txt-hub`, `tube2txt-index`
+- `Dockerfile` — Multi-stage: Bun (TUI build) + Python (runtime)
+- `styles.css` — CSS for generated HTML pages
+- `projects/` — Output directory (gitignored)
+- `tube2txt.db` — SQLite database
+
+## API Endpoints
+
+- `GET /api/videos` — List all videos
+- `GET /api/videos/{slug}` — Video detail with segments + AI files
+- `GET /api/videos/{slug}/images/{filename}` — Serve images
+- `GET /api/search?q=` — FTS5 search across all transcripts
+- `WS /ws/process` — Real-time video processing (send `{action: "start", slug, url, ai, mode}`)
 
 ## Commands
 
 ```bash
-# Process a video (install with pip install -e . first)
-tube2txt my-video "https://www.youtube.com/watch?v=VIDEO_ID" --ai --mode notes
+# Install/update Python deps (system pip is PEP 668 blocked, use uv)
+uv pip install -e "."
+uv pip install pytest httpx  # test deps
 
-# Start the hub dashboard (FastAPI + uvicorn on port 8000)
+# Python CLI
+tube2txt my-video "https://youtube.com/watch?v=..." --ai --mode notes
+
+# Start API server
 tube2txt-hub
 
-# Re-index legacy projects into SQLite
-tube2txt-index
+# TUI development
+cd tui && bun install && bun run dev
 
-# Manual clip extraction
-tube2txt my-video --clip 00:01:00-00:02:00 --video-file projects/my-video/video.mp4
+# Build TUI
+cd tui && bun run build
 
 # Run tests
-python -m pytest tests/ -x -q
+.venv/bin/pytest tests/ -v
 
 # Docker
-docker-compose up --build
+docker compose up hub
+docker compose run tube2txt tube2txt my-video "URL" --ai
 ```
-
-## Architecture
-
-```
-src/tube2txt/
-  __init__.py     # CLI entry point (main), orchestration, parallel image extraction
-  downloader.py   # yt-dlp wrapper: downloads video + subtitles, extracts metadata
-  parsers.py      # VTT subtitle parser
-  ai.py           # GeminiClient: generates outline/notes/recipe/technical/clips via google-genai
-  generator.py    # HTMLGenerator: builds index.html from transcript segments
-  db.py           # Database: SQLite with FTS5 for video indexing and search
-  hub.py          # FastAPI app: dashboard UI (Tailwind CDN + AlpineJS), search, static serving
-  clipping.py     # ClippingEngine: ffmpeg stream-copy clip extraction
-  index_existing.py  # Migration script for legacy projects
-```
-
-Entry points (pyproject.toml):
-- `tube2txt` -> `tube2txt:main`
-- `tube2txt-hub` -> `tube2txt.hub:start_hub`
-- `tube2txt-index` -> `tube2txt.index_existing:migrate`
 
 ## Conventions
 
-- **Output directory**: ALL artifacts go into `projects/<slug>/` (gitignored). Never output elsewhere.
-- **Vanilla web**: Generated pages use raw HTML/CSS only. No frameworks. Hub is the exception (Tailwind CDN + AlpineJS).
-- **Performance**: Image extraction uses `concurrent.futures.ThreadPoolExecutor`. Never serialize.
-- **Error handling**: Fail loudly on `yt-dlp`/`ffmpeg` errors. Suppress output on success.
-- **AI modes**: outline, notes, recipe, technical, clips. AI auto-determines best secondary mode from outline.
-
-## Environment
-
-- `GEMINI_API_KEY` (required for `--ai`): loaded via `python-dotenv` from `.env`
-- `TUBE2TXT_DB` (optional): custom SQLite path, defaults to `tube2txt.db` in CWD
-- System deps: `yt-dlp`, `ffmpeg`, Python 3.9+
+1. All output goes to `projects/<slug>/` directory
+2. Image extraction uses parallel ffmpeg via ThreadPoolExecutor
+3. `process_video()` accepts optional `on_progress` callback — None = print (CLI), function = WebSocket streaming
+4. TUI uses lowercase JSX intrinsics (`<box>`, `<text>`, `<input>`, `<select>`, `<scrollbox>`) per OpenTUI API
+5. Environment: `GEMINI_API_KEY` in `.env`, `TUBE2TXT_DB` for custom DB path
 
 ## Gotchas
 
-- `styles.css` lives at repo root, gets copied into each project dir. The `__init__.py` has a two-step fallback to find it (package dir, then repo root).
-- Hub reads `PROJECTS_DIR` and `DB_PATH` relative to CWD, not the package location.
-- VTT parser expects WebVTT format with timestamp lines like `00:00:01.000 --> 00:00:05.000`.
-- The `--ai` flag requires `GEMINI_API_KEY` but degrades gracefully (skips AI generation with a warning).
+- After editing `src/tube2txt/__init__.py`, run `uv pip install -e "."` before tests — new exports won't be visible otherwise
+- OpenTUI components are lowercase JSX intrinsics, NOT PascalCase (`<box>` not `<Box>`, `<text>` not `<Text>`)
+- Gridland renderer: `const renderer = await createCliRenderer(); createRoot(renderer).render(<App />)` — not a bare `render()` call
+- Bun build requires `--target bun` because OpenTUI uses `bun:ffi` internally
+- `select` component takes `options: [{label, value}]` and `onChange: (index) => void`, not `items`/`value` props
+- The `bun.lock` file should be committed but `node_modules/` is gitignored via `tui/.gitignore`
