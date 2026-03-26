@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from tube2txt import process_video
+from tube2txt.db import Database
 
 CWD = os.getcwd()
 DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
@@ -24,6 +25,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ensure schema exists before serving any requests
+Database(DB_PATH)
+
+
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
