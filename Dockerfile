@@ -32,6 +32,15 @@ COPY --from=tui-builder /tui/dist ./tui-dist/
 
 RUN mkdir -p /app/projects
 
+# Bake in stable defaults so Railway works without manual env-var config.
+# TUBE2TXT_DB must live inside the mounted volume (/app/projects) so the
+# database survives container restarts.
+# TUBE2TXT_TUI_DIR points to where the multi-stage build places the TUI
+# bundle; the pip-installed hub.py cannot resolve this via __file__ because
+# site-packages is several directories removed from /app.
+ENV TUBE2TXT_DB=/app/projects/tube2txt.db \
+    TUBE2TXT_TUI_DIR=/app/tui-dist
+
 EXPOSE 8000
 
 CMD ["tube2txt-hub"]
