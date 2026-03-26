@@ -168,9 +168,11 @@ async def ws_process(websocket: WebSocket):
 def start_hub():
     """Entry point for the hub command."""
     # Serve built TUI assets at root (if available)
-    tui_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tui-dist")
+    # Prefer the env var (set by Dockerfile for Railway); fall back to CWD-relative
+    # paths for local dev.  The __file__-relative approach is intentionally dropped
+    # because pip installs hub.py into site-packages, making the path unreliable.
+    tui_dist = os.environ.get("TUBE2TXT_TUI_DIR") or os.path.join(CWD, "tui-dist")
     if not os.path.exists(tui_dist):
-        # Fallback for development: check CWD
         tui_dist = os.path.join(CWD, "tui", "dist")
     if os.path.exists(tui_dist):
         app.mount("/", StaticFiles(directory=tui_dist, html=True), name="tui")
@@ -178,7 +180,7 @@ def start_hub():
     print(f"Starting Tube2Txt API at http://localhost:8000")
     print(f"Database: {DB_PATH}")
     print(f"Projects: {PROJECTS_DIR}")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
 
 
 if __name__ == "__main__":
