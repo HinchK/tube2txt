@@ -9,7 +9,13 @@
 ## Architecture
 
 ### Python Backend (`src/tube2txt/`)
-- `__init__.py` — Domain classes (Database, ClippingEngine, GeminiClient, VTTParser, HTMLGenerator) + `download_video()`, `extract_images()`, `process_video()`, `main()` CLI
+- `__init__.py` — Import facade + CLI functions: `download_video()`, `extract_images()`, `process_video()`, `main()`
+- `db.py` — `Database` (SQLite/FTS5)
+- `ai.py` — `GeminiClient` (Gemini API)
+- `clipping.py` — `ClippingEngine`
+- `downloader.py` — `Downloader` (yt-dlp wrapper)
+- `parsers.py` — `VTTParser`
+- `generator.py` — `HTMLGenerator`
 - `hub.py` — FastAPI headless JSON API: REST endpoints + WebSocket `/ws/process` for real-time processing
 - `index_existing.py` — Migration script for legacy projects
 
@@ -54,7 +60,7 @@ cd tui && bun install && bun run dev
 cd tui && bun run build
 
 # Run tests
-.venv/bin/pytest tests/ -v
+venv/bin/pytest tests/ -v
 
 # Docker
 docker compose up hub
@@ -71,7 +77,7 @@ docker compose run tube2txt tube2txt my-video "URL" --ai
 
 ## Gotchas
 
-- After editing `src/tube2txt/__init__.py`, run `uv pip install -e "."` before tests — new exports won't be visible otherwise
+- After editing any file in `src/tube2txt/`, run `uv pip install -e "."` before tests — changes won't be visible otherwise
 - OpenTUI components are lowercase JSX intrinsics, NOT PascalCase (`<box>` not `<Box>`, `<text>` not `<Text>`)
 - Gridland renderer: `const renderer = await createCliRenderer(); createRoot(renderer).render(<App />)` — not a bare `render()` call
 - Bun build requires `--target bun` because OpenTUI uses `bun:ffi` internally
