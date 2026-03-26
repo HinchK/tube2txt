@@ -1,0 +1,79 @@
+<h2>Architecture Overview</h2>
+<p class="subtitle">Gridland TUI + FastAPI WebSocket Backend — Single Container</p>
+
+<div class="mockup">
+  <div class="mockup-header">System Architecture</div>
+  <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 13px; line-height: 1.8;">
+    <div style="display: flex; gap: 32px; align-items: flex-start;">
+
+      <!-- Gridland Frontend -->
+      <div style="flex: 1; border: 2px solid var(--accent); border-radius: 8px; padding: 16px;">
+        <div style="text-align: center; font-weight: bold; color: var(--accent); margin-bottom: 12px; font-size: 15px;">
+          GRIDLAND TUI (Bun)
+        </div>
+        <div style="background: var(--bg-secondary); padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+          <strong>Screens</strong><br>
+          &nbsp;&nbsp;ProcessScreen — URL input, mode toggles, live log<br>
+          &nbsp;&nbsp;DashboardScreen — video grid, metadata cards<br>
+          &nbsp;&nbsp;VideoDetailScreen — inline transcript + AI content<br>
+          &nbsp;&nbsp;SearchScreen — FTS5 query + results
+        </div>
+        <div style="background: var(--bg-secondary); padding: 8px; border-radius: 4px;">
+          <strong>State</strong><br>
+          &nbsp;&nbsp;useWebSocket() — connection + message handling<br>
+          &nbsp;&nbsp;useVideos() — REST data fetching<br>
+          &nbsp;&nbsp;useSearch() — search with debounce
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div style="display: flex; flex-direction: column; justify-content: center; align-self: center; text-align: center; padding: 0 8px;">
+        <div style="font-size: 20px;">⟵ REST ⟶</div>
+        <div style="font-size: 20px; margin-top: 8px;">⟵ WS ⟶</div>
+      </div>
+
+      <!-- FastAPI Backend -->
+      <div style="flex: 1; border: 2px solid var(--text-secondary); border-radius: 8px; padding: 16px;">
+        <div style="text-align: center; font-weight: bold; color: var(--text-secondary); margin-bottom: 12px; font-size: 15px;">
+          FASTAPI BACKEND (Python)
+        </div>
+        <div style="background: var(--bg-secondary); padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+          <strong>REST Endpoints</strong><br>
+          &nbsp;&nbsp;GET&nbsp; /api/videos — list all videos<br>
+          &nbsp;&nbsp;GET&nbsp; /api/videos/{slug} — video detail + segments<br>
+          &nbsp;&nbsp;GET&nbsp; /api/search?q= — FTS5 search<br>
+          &nbsp;&nbsp;GET&nbsp; /api/videos/{slug}/ai — AI content files
+        </div>
+        <div style="background: var(--bg-secondary); padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+          <strong>WebSocket</strong><br>
+          &nbsp;&nbsp;WS /ws/process — send job, receive progress stream
+        </div>
+        <div style="background: var(--bg-secondary); padding: 8px; border-radius: 4px;">
+          <strong>Domain Layer</strong> (existing modules)<br>
+          &nbsp;&nbsp;Downloader → VTTParser → GeminiClient<br>
+          &nbsp;&nbsp;HTMLGenerator → Database → ClippingEngine
+        </div>
+      </div>
+    </div>
+
+    <!-- Data stores -->
+    <div style="margin-top: 20px; display: flex; gap: 16px; justify-content: center;">
+      <div style="border: 1px dashed var(--text-secondary); border-radius: 4px; padding: 8px 16px; text-align: center;">
+        tube2txt.db (SQLite + FTS5)
+      </div>
+      <div style="border: 1px dashed var(--text-secondary); border-radius: 4px; padding: 8px 16px; text-align: center;">
+        projects/ (generated artifacts)
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>Key Design Decisions</h3>
+  <ul>
+    <li><strong>hub.py transforms</strong> from a full HTML-serving app into a headless API — existing Database, search, and static file logic stays, HTML rendering is stripped</li>
+    <li><strong>process_video_logic</strong> gets wrapped with progress callbacks that push messages over the WebSocket (download %, extraction status, AI generation steps)</li>
+    <li><strong>Gridland app</strong> lives in a new <code>tui/</code> directory at project root — separate Bun project with its own <code>package.json</code></li>
+    <li><strong>Single Docker image</strong> uses multi-stage build: Bun builds the Gridland app, Python stage runs FastAPI + serves the built TUI assets</li>
+  </ul>
+</div>

@@ -1,0 +1,143 @@
+<h2>TUI Screen Layouts</h2>
+<p class="subtitle">Four screens in the Gridland TUI — tab-based navigation</p>
+
+<!-- Navigation mockup -->
+<div class="mockup" style="margin-bottom: 24px;">
+  <div class="mockup-header">Global Navigation (always visible)</div>
+  <div class="mockup-body" style="padding: 12px; font-family: monospace; font-size: 13px;">
+    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">
+      <div>
+        <strong style="color: var(--accent);">tube2txt</strong>&nbsp;&nbsp;
+        <span style="opacity: 0.5">|</span>&nbsp;&nbsp;
+        <span style="background: var(--accent); color: var(--bg); padding: 2px 8px; border-radius: 3px;">[1] Process</span>&nbsp;
+        <span style="opacity: 0.7">[2] Dashboard</span>&nbsp;
+        <span style="opacity: 0.7">[3] Search</span>
+      </div>
+      <div style="opacity: 0.5;">ws: connected</div>
+    </div>
+  </div>
+</div>
+
+<!-- Screen 1: Process -->
+<div class="mockup" style="margin-bottom: 24px;">
+  <div class="mockup-header">Screen 1: Process</div>
+  <div class="mockup-body" style="padding: 16px; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    <div style="margin-bottom: 12px;">
+      <span style="opacity: 0.6;">URL:</span>&nbsp;
+      <span style="border: 1px solid var(--text-secondary); padding: 2px 8px; border-radius: 3px; min-width: 300px; display: inline-block;">https://youtube.com/watch?v=dQw4w9WgXcQ</span>
+    </div>
+    <div style="margin-bottom: 12px;">
+      <span style="opacity: 0.6;">Slug:</span>&nbsp;
+      <span style="border: 1px solid var(--text-secondary); padding: 2px 8px; border-radius: 3px; display: inline-block;">rick-roll</span>
+    </div>
+    <div style="margin-bottom: 16px; display: flex; gap: 16px;">
+      <span style="opacity: 0.6;">AI Mode:</span>
+      <span style="background: var(--accent); color: var(--bg); padding: 1px 8px; border-radius: 3px;">outline</span>
+      <span style="border: 1px solid var(--text-secondary); padding: 1px 8px; border-radius: 3px;">notes</span>
+      <span style="border: 1px solid var(--text-secondary); padding: 1px 8px; border-radius: 3px;">recipe</span>
+      <span style="border: 1px solid var(--text-secondary); padding: 1px 8px; border-radius: 3px;">technical</span>
+      <span style="border: 1px solid var(--text-secondary); padding: 1px 8px; border-radius: 3px;">clips</span>
+    </div>
+    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+      <span style="background: var(--accent); color: var(--bg); padding: 4px 16px; border-radius: 3px; font-weight: bold;">[ Start Processing ]</span>
+      <span style="opacity: 0.5;">Parallel: 4</span>
+    </div>
+    <div style="border: 1px solid var(--text-secondary); border-radius: 4px; padding: 12px; background: var(--bg); min-height: 150px;">
+      <div style="opacity: 0.5; margin-bottom: 8px;">── Terminal Log ──</div>
+      <div style="color: var(--accent);">▶ Downloading video and subtitles...</div>
+      <div style="opacity: 0.8;">&nbsp;&nbsp;yt-dlp: 45% [████████░░░░░░░░] 12.3MB/27.1MB</div>
+      <div style="color: var(--accent);">▶ Parsing subtitles...</div>
+      <div style="color: var(--accent);">▶ Generating outline...</div>
+      <div style="opacity: 0.7;">&nbsp;&nbsp;## Introduction [00:00:15]</div>
+      <div style="opacity: 0.7;">&nbsp;&nbsp;## Main Topic [00:02:30]</div>
+      <div style="color: var(--accent);">▶ Extracting images (12/48)...</div>
+      <div style="opacity: 0.5;">█████████████░░░░░░░░░ 25%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Screen 2: Dashboard -->
+<div class="mockup" style="margin-bottom: 24px;">
+  <div class="mockup-header">Screen 2: Dashboard</div>
+  <div class="mockup-body" style="padding: 16px; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    <div style="margin-bottom: 12px; opacity: 0.6;">3 videos processed</div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="border: 1px solid var(--accent); border-radius: 4px; padding: 10px; display: flex; justify-content: space-between;">
+        <div>
+          <strong>rick-roll</strong><br>
+          <span style="opacity: 0.6;">Never Gonna Give You Up — Full Analysis</span>
+        </div>
+        <div style="text-align: right; opacity: 0.5;">
+          2026-03-25<br>
+          outline, notes
+        </div>
+      </div>
+      <div style="border: 1px solid var(--text-secondary); border-radius: 4px; padding: 10px; display: flex; justify-content: space-between;">
+        <div>
+          <strong>cooking-basics</strong><br>
+          <span style="opacity: 0.6;">Gordon Ramsay — Scrambled Eggs</span>
+        </div>
+        <div style="text-align: right; opacity: 0.5;">
+          2026-03-24<br>
+          outline, recipe
+        </div>
+      </div>
+      <div style="border: 1px solid var(--text-secondary); border-radius: 4px; padding: 10px; display: flex; justify-content: space-between;">
+        <div>
+          <strong>python-async</strong><br>
+          <span style="opacity: 0.6;">Understanding Python Async/Await</span>
+        </div>
+        <div style="text-align: right; opacity: 0.5;">
+          2026-03-23<br>
+          outline, technical
+        </div>
+      </div>
+    </div>
+    <div style="margin-top: 12px; opacity: 0.5;">↑↓ navigate &nbsp; Enter: view detail &nbsp; d: delete &nbsp; o: open in browser</div>
+  </div>
+</div>
+
+<!-- Screen 3: Video Detail -->
+<div class="mockup" style="margin-bottom: 24px;">
+  <div class="mockup-header">Screen 3: Video Detail (after selecting from Dashboard)</div>
+  <div class="mockup-body" style="padding: 16px; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    <div style="margin-bottom: 12px;">
+      <strong style="font-size: 14px;">Never Gonna Give You Up — Full Analysis</strong><br>
+      <span style="opacity: 0.5;">rick-roll &nbsp;|&nbsp; https://youtube.com/watch?v=... &nbsp;|&nbsp; 2026-03-25</span>
+    </div>
+    <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+      <span style="background: var(--accent); color: var(--bg); padding: 1px 8px; border-radius: 3px;">Transcript</span>
+      <span style="border: 1px solid var(--text-secondary); padding: 1px 8px; border-radius: 3px;">Outline</span>
+      <span style="border: 1px solid var(--text-secondary); padding: 1px 8px; border-radius: 3px;">Notes</span>
+    </div>
+    <div style="border: 1px solid var(--text-secondary); border-radius: 4px; padding: 12px; max-height: 200px; overflow-y: auto;">
+      <div style="margin-bottom: 6px;"><span style="color: var(--accent);">[00:00:01]</span> We're no strangers to love</div>
+      <div style="margin-bottom: 6px;"><span style="color: var(--accent);">[00:00:05]</span> You know the rules and so do I</div>
+      <div style="margin-bottom: 6px;"><span style="color: var(--accent);">[00:00:10]</span> A full commitment's what I'm thinking of</div>
+      <div style="margin-bottom: 6px;"><span style="color: var(--accent);">[00:00:15]</span> You wouldn't get this from any other guy</div>
+      <div style="opacity: 0.5;">... (scrollable)</div>
+    </div>
+    <div style="margin-top: 12px; opacity: 0.5;">Tab: switch content &nbsp; o: open HTML in browser &nbsp; Esc: back to dashboard</div>
+  </div>
+</div>
+
+<!-- Screen 4: Search -->
+<div class="mockup" style="margin-bottom: 24px;">
+  <div class="mockup-header">Screen 4: Search</div>
+  <div class="mockup-body" style="padding: 16px; font-family: monospace; font-size: 12px; line-height: 1.7;">
+    <div style="margin-bottom: 12px;">
+      <span style="opacity: 0.6;">Search:</span>&nbsp;
+      <span style="border: 1px solid var(--accent); padding: 2px 8px; border-radius: 3px; display: inline-block; min-width: 250px;">scrambled eggs</span>
+    </div>
+    <div style="opacity: 0.5; margin-bottom: 8px;">3 results across 1 video</div>
+    <div style="border: 1px solid var(--text-secondary); border-radius: 4px; padding: 10px; margin-bottom: 6px;">
+      <div><strong>cooking-basics</strong> <span style="color: var(--accent);">[00:01:22]</span></div>
+      <div style="opacity: 0.8;">...the key to perfect <span style="background: var(--accent); color: var(--bg);">scrambled eggs</span> is low heat and patience...</div>
+    </div>
+    <div style="border: 1px solid var(--text-secondary); border-radius: 4px; padding: 10px; margin-bottom: 6px;">
+      <div><strong>cooking-basics</strong> <span style="color: var(--accent);">[00:03:45]</span></div>
+      <div style="opacity: 0.8;">...fold the <span style="background: var(--accent); color: var(--bg);">scrambled eggs</span> gently, take off heat while still wet...</div>
+    </div>
+    <div style="margin-top: 12px; opacity: 0.5;">↑↓ navigate &nbsp; Enter: jump to video at timestamp &nbsp; Esc: clear</div>
+  </div>
+</div>

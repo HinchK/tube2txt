@@ -1,134 +1,212 @@
-# Tube2Txt v3
+# Tube2Txt v3.1
 
 > **Inspiration:** This project is a modern rewrite of the original [Youtube2Webpage](https://github.com/obra/Youtube2Webpage) script.
 
-Tube2Txt is a central intelligence platform that converts YouTube videos and playlists into structured web pages with transcripts, screenshots, and AI-assisted analysis.
+Tube2Txt converts YouTube videos into structured web pages with transcripts, screenshots, and AI-assisted analysis. It ships with a **Gridland TUI dashboard** and a headless **FastAPI + WebSocket API**.
 
-## New in v3.0
+## Features
 
-- **AI Voice by Strunk & White**: AI-generated content (outlines, notes, etc.) follows the principles of *The Elements of Style* (1918) for concise, vigorous, and active writing.
-- **Vibrant Terminal Output**: AI-generated markdown is displayed in-color (Cyan) directly in your terminal for immediate review.
-- **Artifact Summary**: A complete list of absolute paths to all generated files (HTML, images, markdown, clips) is provided upon completion.
-- **Tube2Txt Hub**: A local web dashboard to browse your video library.
-- **Global Search**: Search for any word or phrase across **all** your processed videos via FTS5.
-- **Smart Clips**:
-  - **Manual Clips**: Extract specific video segments with a simple command.
-  - **AI-Driven Clips**: Gemini identifies the most interesting moments and extracts them automatically.
-- **SQLite Database**: Centralized storage for metadata and searchable transcripts.
-- **Environment-based Config**: Set `TUBE2TXT_DB` to customize your database location.
+- **Gridland TUI**: Terminal dashboard built with Bun + OpenTUI + React — process videos, browse your library, and search transcripts, all from the terminal.
+- **WebSocket Processing**: Real-time progress streaming via `/ws/process` — the TUI connects here to show live logs.
+- **REST API**: Full JSON API for video listing, detail, image serving, and FTS5 search.
+- **AI Analysis**: Gemini-powered outlines, notes, recipes, technical summaries, and smart clip extraction.
+- **AI Voice by Strunk & White**: AI-generated content follows *The Elements of Style* (1918) for concise, active writing.
+- **FTS5 Global Search**: Search any word or phrase across all processed videos.
+- **Smart Clips**: Manual or AI-driven video segment extraction.
+- **Parallel Screenshot Extraction**: Up to 10x faster via `ThreadPoolExecutor` + ffmpeg.
+- **SQLite Database**: Centralized metadata and searchable transcript storage.
+- **Docker Support**: Multi-stage Dockerfile with Bun TUI build and Python runtime.
+
+## Architecture
+
+```
+src/tube2txt/
+  ├─ __init__.py        ← Core: Database, ClippingEngine, GeminiClient,
+  │                       VTTParser, HTMLGenerator; download_video(),
+  │                       extract_images(), process_video(), main() CLI
+  ├─ hub.py             ← FastAPI API: REST endpoints + WebSocket /ws/process
+  └─ index_existing.py  ← Migration script for legacy projects
+
+tui/
+  ├─ src/index.tsx      ← App entry, screen router, navigation bar
+  ├─ src/hooks/         ← useWebSocket.ts, useVideos.ts, useSearch.ts
+  ├─ src/screens/       ← ProcessScreen, DashboardScreen, VideoDetailScreen, SearchScreen
+  └─ src/components/    ← TerminalLog, VideoCard, SearchResult
+
+pyproject.toml          ← Package config, entry points
+Dockerfile              ← Multi-stage: Bun (TUI) + Python (runtime)
+styles.css              ← CSS for generated HTML pages
+projects/               ← Output directory (gitignored)
+tube2txt.db             ← SQLite database (gitignored)
+```
+
+## Web Showcase (Gridland Aesthetic)
+
+We've included a standalone React component that provides a "Gridland" inspired terminal experience for showcasing `tube2txt` on the web.
+
+### Features
+- **CRT Effect**: Authentic scanlines, flicker, and glow.
+- **Simulated CLI**: Interactive typing demo showing the `--ai` pipeline.
+- **TUI Grid**: Terminal-style feature showcase using box-drawing aesthetics.
+
+### Integration
+Copy `src/components/Tube2TxtShowcase.tsx` into your React/Next.js project. It requires **Tailwind CSS**.
+
+```tsx
+import Tube2TxtShowcase from './components/Tube2TxtShowcase';
+
+export default function Page() {
+  return <Tube2TxtShowcase />;
+}
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/videos` | List all videos (ordered by date) |
+| `GET` | `/api/videos/{slug}` | Video detail with segments and AI files |
+| `GET` | `/api/videos/{slug}/images/{filename}` | Serve project images |
+| `GET` | `/api/search?q=` | FTS5 full-text search across all transcripts |
+| `WS` | `/ws/process` | Real-time video processing with progress events |
+
+### WebSocket Protocol (`/ws/process`)
+
+Send a JSON message to start processing:
+
+```json
+{
+  "action": "start",
+  "slug": "my-video",
+  "url": "https://youtube.com/watch?v=...",
+  "ai": true,
+  "mode": "outline"
+}
+```
+
+The server streams back `{"type": "...", "step": "...", "message": "..."}` events.
 
 ## Installation
 
-### Method 1: Local (pip/pipx) - Recommended
-
-You can install `tube2txt` as a package. This is the easiest way to use the CLI tools globally.
+### Method 1: uv (Recommended)
 
 ```bash
-# Recommended for CLI apps
+# Install Python deps into a virtual env
+uv pip install -e "."
+
+# Test deps
+uv pip install pytest httpx
+```
+
+### Method 2: pip/pipx
+
+```bash
+# For global CLI access
 pipx install .
 
-# Or using pip in a virtual environment
+# Or inside a venv
 pip install .
 ```
 
-After installation, the following commands are available:
-- `tube2txt` - The main Python worker (for VTT parsing, AI generation, and DB indexing)
-- `tube2txt-hub` - Launches the Local Hub dashboard
-- `tube2txt-index` - Migrates or re-indexes existing projects
+After installation, three commands are available:
 
-### Method 2: Hybrid Bash/Python
+| Command | Description |
+|---|---|
+| `tube2txt` | Main Python worker (VTT parsing, AI generation, DB indexing) |
+| `tube2txt-hub` | Starts the API server + serves the TUI dashboard |
+| `tube2txt-index` | Migrates or re-indexes existing projects |
 
-If you prefer to run the script directly from the repository, ensure you have installed the Python dependencies:
-
-### Method 2: Docker
+### Method 3: Docker
 
 ```bash
-docker-compose up --build
-# Then in another terminal:
-docker-compose run tube2txt <project-name> <url> --ai
+docker compose up hub
+# In another terminal:
+docker compose run tube2txt tube2txt my-video "https://youtube.com/watch?v=..." --ai
 ```
 
 ## Usage
 
-### 1. Process a Video (via CLI or Bash script)
+### Process a Video
 
 ```bash
-# Using CLI (if installed via pip/pipx)
-tube2txt --vtt video.vtt --url "url" --slug project --ai
-
-# Using Bash script (Recommended - orchestrates yt-dlp, ffmpeg, and Python)
-./tube2txt.sh my-project "https://www.youtube.com/watch?v=..." --ai
+tube2txt my-video "https://www.youtube.com/watch?v=..." --ai --mode notes
 ```
 
-Output goes to `projects/my-project/` with:
-- `index.html` — transcript page with timestamped screenshots
-- `images/` — extracted video frames
-- `TUBE2TXT-OUTLINE.md` — AI-generated content (when `--ai` is used)
+Output goes to `projects/my-video/`:
 
-### 2. Launch the Hub
+| File | Description |
+|---|---|
+| `index.html` | Transcript page with timestamped screenshots |
+| `images/` | Extracted video frames |
+| `TUBE2TXT-OUTLINE.md` | AI outline (when `--ai` is used) |
+| `TUBE2TXT-NOTES.md` | AI notes (when `--mode notes`) |
+
+### Launch the Hub + TUI
 
 ```bash
-# Using CLI
 tube2txt-hub
-
-# Or using Bash script
-./tube2txt.sh hub
+# Open http://localhost:8000 in a browser, or the Gridland TUI connects automatically
 ```
 
-The hub lets you browse all processed videos and search across every transcript.
-
-### 3. Smart Clips
-
-- **AI Clipping** (Gemini picks the best moments):
-  ```bash
-  ./tube2txt.sh my-project "url" --ai --mode clips
-  ```
-- **Manual Clipping**:
-  ```bash
-  ./tube2txt.sh clip my-project 00:01:00-00:02:30
-  ```
-
-### 4. Re-index Existing Projects
+### TUI Development
 
 ```bash
-# Using CLI
-tube2txt-index
-
-# Or using script manually
-python3 -m tube2txt.index_existing
+cd tui && bun install && bun run dev
 ```
 
-### Options
+### Build TUI for Production
+
+```bash
+cd tui && bun run build
+# Output goes to tui/dist/, served at / by tube2txt-hub
+```
+
+### Smart Clips
+
+```bash
+# AI picks the best moments
+tube2txt my-video "url" --ai --mode clips
+
+# Manual clip extraction
+tube2txt my-video "url" --clip 00:01:00-00:02:30
+```
+
+### Re-index Existing Projects
+
+```bash
+tube2txt-index
+# Or: python3 -m tube2txt.index_existing
+```
+
+## Options
 
 | Flag | Description |
 |---|---|
-| `--ai` | Generate AI content |
+| `--ai` | Generate AI content via Gemini |
 | `--mode <mode>` | AI mode: `outline` (default), `notes`, `recipe`, `technical`, `clips` |
-| `--parallel <N>` | Number of parallel `ffmpeg` processes (default: 4) |
+| `--parallel <N>` | Parallel ffmpeg processes for screenshot extraction (default: 4) |
 
 ## Environment Variables
 
 | Variable | Description | Default |
 |---|---|---|
 | `GEMINI_API_KEY` | Google Gemini API key (required for `--ai`) | — |
-| `TUBE2TXT_DB` | Path to SQLite database | `tube2txt.db` (in project root) |
+| `TUBE2TXT_DB` | Path to the SQLite database file | `tube2txt.db` in CWD |
 
-## Architecture
+## Running Tests
 
-```
-tube2txt.sh             ← Bash entry point (orchestrates yt-dlp, ffmpeg, tube2txt)
-src/tube2txt/
-  ├─ __init__.py        ← Core Python worker (VTT, AI, HTML gen, DB indexing)
-  ├─ hub.py             ← FastAPI dashboard (browse + search)
-  └─ index_existing.py  ← Migration script for legacy projects
-styles.css              ← Copied into each project
-projects/               ← All generated output (gitignored)
-tube2txt.db             ← SQLite with FTS5 search index (gitignored)
+```bash
+.venv/bin/pytest tests/ -v
 ```
 
-## Features
+## Windows
 
-- **Parallel Processing**: Screenshot extraction is up to 10x faster via `xargs -P`.
-- **Playlist Support**: Pass a playlist URL to process everything at once.
-- **Docker Support**: Run everything in containers with `docker-compose`.
-- **Windows Support**: See [WINDOWS-INSTALL.md](WINDOWS-INSTALL.md).
+See [WINDOWS-INSTALL.md](WINDOWS-INSTALL.md).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+MIT

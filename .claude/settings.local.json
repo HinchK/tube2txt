@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.gridland.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:opentui.com)",
+      "WebFetch(domain:news.ycombinator.com)",
+      "WebFetch(domain:opentui.vercel.app)",
+      "Bash(/Users/hinchk/.claude/plugins/cache/superpowers-extended-cc-marketplace/superpowers-extended-cc/5.1.2/scripts/start-server.sh --project-dir /Users/hinchk/code/apps/TubedToText)",
+      "Bash(bash /Users/hinchk/.claude/plugins/cache/superpowers-extended-cc-marketplace/superpowers-extended-cc/5.1.2/skills/brainstorming/scripts/start-server.sh --project-dir /Users/hinchk/code/apps/TubedToText)",
+      "Bash(git:*)",
+      "Bash(python:*)",
+      "Bash(pip3 install:*)",
+      "Bash(.venv/bin/python -m pytest tests/test_process_video.py::test_download_video_calls_ytdlp -v 2>&1)",
+      "Bash(venv/bin/python -m pytest tests/test_process_video.py::test_download_video_calls_ytdlp -v 2>&1)",
+      "Bash(venv/bin/python -m pytest tests/test_process_video.py -v 2>&1)",
+      "Bash(python3:*)",
+      "Bash(uv pip:*)",
+      "Bash(.venv/bin/pytest tests/test_process_video.py -v 2>&1)",
+      "Bash(.venv/bin/pytest tests/test_process_video.py -v)",
+      "Bash(bun install:*)",
+      "Bash(.venv/bin/pytest tests/test_api.py -v)",
+      "Bash(bun run:*)",
+      "Bash(.venv/bin/pytest tests/ -v)"
+    ]
+  }
+}
