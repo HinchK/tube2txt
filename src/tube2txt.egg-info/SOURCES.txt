@@ -17,4 +17,7 @@ src/tube2txt.egg-info/entry_points.txt
 src/tube2txt.egg-info/requires.txt
 src/tube2txt.egg-info/top_level.txt
 tests/test_api.py
+tests/test_db.py
+tests/test_generator.py
+tests/test_parsers.py
 tests/test_process_video.py
