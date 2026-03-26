@@ -31,7 +31,7 @@ This file serves as the system rules, context, and orientation guide for any AI 
 - `Dockerfile` — Multi-stage build: Bun (TUI) + Python (runtime)
 - `docker-compose.yml` — Hub and CLI services
 - `styles.css` — CSS for generated HTML pages
-- `src/components/Tube2TxtShowcase.tsx` — Standalone Gridland-aesthetic web showcase component
+- `tui/src/components/Tube2TxtShowcase.tsx` — Standalone Gridland-aesthetic web showcase component
 - `projects/` — Output directory (gitignored)
 - `tube2txt.db` — SQLite database for video index and FTS5 search
 
