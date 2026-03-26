@@ -6,7 +6,7 @@
   },
   "deploy": {
     "startCommand": "tube2txt-hub",
-    "healthcheckPath": "/api/videos",
+    "healthcheckPath": "/healthz",
     "restartPolicyType": "ON_FAILURE"
   },
   "service": {
