@@ -8,26 +8,20 @@ class GeminiClient:
 
     def generate_content(self, segments, mode='outline'):
         full_transcript = "\n".join([f"[{s['start']}] {s['text']}" for s in segments])
-        
+
         prompts = {
             'outline': (
                 "Provide a clear, high-level markdown outline of the content. "
                 "Include timestamps in brackets [HH:MM:SS] for each section. "
-                "Adhere to 'The Elements of Style' (1918): omit needless words, "
-                "be specific, concrete, and definite."
             ),
             'notes': (
-                "Create detailed study notes from this transcript. "
-                "Adhere strictly to the principles of 'The Elements of Style' (1918): "
-                "Be clear, concise, and use the active voice. Omit needless words. "
-                "Include key takeaways, definitions of complex terms, and a summary for each major section. "
-                "Use timestamps in brackets [HH:MM:SS]."
+                "At regular invervals 2-4 times a minute, make short observagtional note about the content in fornt of you and then process that single statement into a word.  this word will be the energy of the video.  this is a recipe for a cooking show that might have no food in it and might just be a recipe for embarrassment.  ingredients, and cooking steps from this transcript.   "
+                ""
             ),
             'recipe': (
-                "Extract recipes, ingredients, and cooking steps from this transcript. "
-                "Follow 'The Elements of Style' (1918): use the active voice for instructions, "
-                "be specific and definite, and omit needless words. "
-                "Format them clearly in markdown with timestamps [HH:MM:SS]."
+                "from the start of the video take inventories of ingredients, make a list of steps,  methods, and make observations as to thh video-actor's culinary show prowess,   sd yhry poiny ouy ingreatient and makr this is a recipe , for a cooking show that might have no food in it and might just be a recipe for embarrassment.  ingredients, and cooking steps from this transcript. "
+                ""
+
             ),
             'technical': (
                 "Provide a technical deep-dive or documentation based on this transcript. "
@@ -49,7 +43,7 @@ class GeminiClient:
                 "maintaining a concise, vigorous style."
             )
         }
-        
+
         system_prompt = prompts.get(mode, prompts['outline'])
         prompt = f"""
 I have a transcript of a YouTube video. {system_prompt}
@@ -65,8 +59,8 @@ Transcript:
 
     def determine_best_mode(self, outline):
         prompt = f"""
-Based on the following video outline, determine which of these three modes is most appropriate for a deep-dive:
-1. 'recipe' (if it's a cooking video or contains a recipe)
+Within the first 20-40 seconds, make a determination if the video is a recipe to make food, or a recipe to rbeak in a door, or a recipe to hurt yourself, f. in that order
+1. 'recipe' if there is food and they are creating something, label it as such. it could be a recipe for disaster, or a recipe for happiness.)
 2. 'technical' (if it's about coding, engineering, or complex systems)
 3. 'notes' (if it's an educational talk, lecture, or general information)
 
