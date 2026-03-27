@@ -11,7 +11,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from tube2txt import process_video
-from tube2txt.db import Database
 
 CWD = os.getcwd()
 DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
@@ -25,15 +24,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Ensure schema exists before serving any requests
-Database(DB_PATH)
-
-
-@app.get("/healthz")
-async def healthz():
-    return {"status": "ok"}
-
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -178,19 +168,39 @@ async def ws_process(websocket: WebSocket):
 def start_hub():
     """Entry point for the hub command."""
     # Serve built TUI assets at root (if available)
-    # Prefer the env var (set by Dockerfile for Railway); fall back to CWD-relative
-    # paths for local dev.  The __file__-relative approach is intentionally dropped
-    # because pip installs hub.py into site-packages, making the path unreliable.
-    tui_dist = os.environ.get("TUBE2TXT_TUI_DIR") or os.path.join(CWD, "tui-dist")
+    # Search order: /app/static (Docker), ./static (local), ./tui/dist (dev fallback)
+    tui_dist = os.path.join(CWD, "static")
     if not os.path.exists(tui_dist):
         tui_dist = os.path.join(CWD, "tui", "dist")
+
     if os.path.exists(tui_dist):
-        app.mount("/", StaticFiles(directory=tui_dist, html=True), name="tui")
+        print(f"Serving TUI from: {tui_dist}")
+
+        # Handle SPA fallback and static files
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str = ""):
+            # If it's an API or WS route, but we got here, it's a 404 for the API
+            if full_path.startswith("api/") or full_path.startswith("ws/"):
+                return JSONResponse(status_code=404, content={"error": "Not found"})
+
+            # Root path
+            if not full_path or full_path == "":
+                return FileResponse(os.path.join(tui_dist, "index.html"))
+
+            # Check if it's a file that exists in the dist directory
+            file_path = os.path.join(tui_dist, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+
+            # Fallback to index.html for SPA (client-side routing)
+            return FileResponse(os.path.join(tui_dist, "index.html"))
+    else:
+        print("Warning: TUI dist directory not found. Serving API only.")
 
     print(f"Starting Tube2Txt API at http://localhost:8000")
     print(f"Database: {DB_PATH}")
     print(f"Projects: {PROJECTS_DIR}")
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 if __name__ == "__main__":

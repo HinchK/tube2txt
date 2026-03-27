@@ -4,15 +4,6 @@ All notable changes to Tube2Txt are documented here.
 
 ---
 
-## [3.2.1] — 2026-03-26
-
-### Added
-- **Project Obsidian Pulse** — a classy, subtle integration in the web showcase footer.
-- **Improved Footer Layout** — responsive and centered with project codename, timestamp, and repository link.
-- **GitHub Repository Link** — direct link to `github.com/hinchk/tube2txt` with consistent iconography.
-
----
-
 ## [3.2.0] — 2026-03-25
 
 ### Added
