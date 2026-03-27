@@ -28,6 +28,7 @@ tube2txt.db
 OUTPUT/
 */images/
 */index.html
+!tui/index.html
 */TUBE2TXT-OUTLINE.md
 */TUBE2TXT-*.md
 */styles.css
@@ -47,3 +48,4 @@ clips/
 GEM-PLAN/
 .idea/
 .vscode/
+.claude/settings.local.json

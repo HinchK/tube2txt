@@ -1,9 +1,9 @@
 import os
 import re
 import sys
+import json
 import argparse
-import glob
-import shutil
+import sqlite3
 import subprocess
 import glob as glob_module
 import shutil
@@ -14,143 +14,261 @@ try:
     load_dotenv()
 except ImportError:
     pass
-
-from .db import Database
-from .parsers import VTTParser
-from .generator import HTMLGenerator
-from .ai import GeminiClient
-from .downloader import Downloader
-from .clipping import ClippingEngine
+from google import genai
+from google.genai import types
 
 # Constants for terminal coloring
 CLI_COLOR_CYAN = "\033[36m"
 CLI_COLOR_RESET = "\033[0m"
 
-def extract_single_image(video_path, ts, output_path):
-    """Extract a single image frame using ffmpeg."""
-    cmd = [
-        "ffmpeg", "-ss", ts, "-nostdin", "-i", video_path, 
-        "-frames:v", "1", "-q:v", "2", "-vf", "scale=1024:-1", 
-        output_path, "-loglevel", "error", "-y"
-    ]
-    try:
-        subprocess.run(cmd, check=True)
-        return True
-    except Exception as e:
-        print(f"Error extracting image at {ts}: {e}")
-        return False
+class Database:
+    def __init__(self, db_path="tube2txt.db"):
+        self.db_path = db_path
+        self.init_db()
 
-def process_video_logic(url, slug, mode, ai_flag, db_path, parallel, projects_dir, styles_css_path):
-    print(f"----------------------------------------------------")
-    print(f"Processing video: {slug} ({url})")
-    print(f"----------------------------------------------------")
-    
-    project_path = os.path.join(projects_dir, slug)
-    os.makedirs(os.path.join(project_path, "images"), exist_ok=True)
-    
-    # Copy styles.css
-    if os.path.exists(styles_css_path):
-        shutil.copy(styles_css_path, os.path.join(project_path, "styles.css"))
-    
-    # Download
-    print("Downloading video and subtitles...")
-    video_file, vtt_file, metadata = Downloader.get_video_and_subs(url, project_path)
-    
-    if not video_file or not vtt_file:
-        print(f"Error: Could not download video or subtitles for {slug}.")
-        return None
+    def init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS videos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    slug TEXT UNIQUE,
+                    url TEXT,
+                    title TEXT,
+                    processed_at DATETIME
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS segments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    video_id INTEGER,
+                    start_ts TEXT,
+                    seconds INTEGER,
+                    text TEXT,
+                    thumbnail_path TEXT,
+                    FOREIGN KEY (video_id) REFERENCES videos (id)
+                )
+            """)
+            # FTS for global search
+            cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS segments_search USING fts5(segment_id, text)")
+            conn.commit()
 
-    # Parse & Generate HTML
-    print("Generating HTML and processing transcript...")
-    vtt_path = os.path.join(project_path, vtt_file)
-    parser = VTTParser(vtt_path)
-    segments = parser.parse()
-    
-    # Use real title if available for HTML
-    display_title = metadata.get("title", slug)
-    html_gen = HTMLGenerator(segments, url, display_title)
-    html_gen.generate(os.path.join(project_path, "index.html"))
-    
-    # DB Indexing
-    db = Database(db_path)
-    db.index_video(slug, url, segments, metadata=metadata)
-    print(f"Video indexed in DB: {db_path}")
-    
-    # AI Content
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if ai_flag and not api_key:
-        print("Warning: GEMINI_API_KEY not found. Skipping AI generation.")
-        api_key = None
+    def index_video(self, slug, url, segments):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR REPLACE INTO videos (slug, url, title, processed_at) VALUES (?, ?, ?, ?)",
+                         (slug, url, slug, datetime.now().isoformat()))
+            video_id = cursor.lastrowid
+            
+            # Clear old segments if any
+            cursor.execute("DELETE FROM segments WHERE video_id = ?", (video_id,))
+            
+            for seg in segments:
+                ts_filename = seg['start'].replace(':', '-').replace('.', '-')
+                thumbnail_path = f"images/{ts_filename}.jpg"
+                cursor.execute("INSERT INTO segments (video_id, start_ts, seconds, text, thumbnail_path) VALUES (?, ?, ?, ?, ?)",
+                             (video_id, seg['start'], seg['seconds'], seg['text'], thumbnail_path))
+                segment_id = cursor.lastrowid
+                cursor.execute("INSERT INTO segments_search (segment_id, text) VALUES (?, ?)", (segment_id, seg['text']))
+            conn.commit()
 
-    if api_key:
-        client = GeminiClient(api_key)
+class ClippingEngine:
+    @staticmethod
+    def extract_clip(video_file, start_ts, end_ts, output_path):
+        """Extract a clip using ffmpeg stream copy (lossless and fast)."""
+        cmd = [
+            "ffmpeg", "-ss", start_ts, "-to", end_ts,
+            "-i", video_file, "-c", "copy", "-map", "0",
+            output_path, "-loglevel", "error", "-y"
+        ]
+        try:
+            subprocess.run(cmd, check=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting clip: {e}")
+            return False
+
+class GeminiClient:
+    def __init__(self, api_key):
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is required.")
+        self.client = genai.Client(api_key=api_key)
+
+    def generate_content(self, segments, mode='outline'):
+        full_transcript = "\n".join([f"[{s['start']}] {s['text']}" for s in segments])
         
-        # 1. Outline
-        print("\n--- GENERATING OUTLINE ---")
-        outline = client.generate_content(segments, mode='outline')
-        with open(os.path.join(project_path, "TUBE2TXT-OUTLINE.md"), 'w', encoding='utf-8') as f:
-            f.write(outline)
-        for line in outline.split('\n'):
-            print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
+        prompts = {
+            'outline': (
+                "Provide a clear, high-level markdown outline of the content. "
+                "Include timestamps in brackets [HH:MM:SS] for each section. "
+                "Adhere to 'The Elements of Style' (1918): omit needless words, "
+                "be specific, concrete, and definite."
+            ),
+            'notes': (
+                "Create detailed study notes from this transcript. "
+                "Adhere strictly to the principles of 'The Elements of Style' (1918): "
+                "Be clear, concise, and use the active voice. Omit needless words. "
+                "Include key takeaways, definitions of complex terms, and a summary for each major section. "
+                "Use timestamps in brackets [HH:MM:SS]."
+            ),
+            'recipe': (
+                "Extract recipes, ingredients, and cooking steps from this transcript. "
+                "Follow 'The Elements of Style' (1918): use the active voice for instructions, "
+                "be specific and definite, and omit needless words. "
+                "Format them clearly in markdown with timestamps [HH:MM:SS]."
+            ),
+            'technical': (
+                "Provide a technical deep-dive or documentation based on this transcript. "
+                "Adhere to 'The Elements of Style' (1918): use definite, specific, concrete language. "
+                "Omit needless words. Focus on implementation details, code concepts, and architectural points. "
+                "Use timestamps in brackets [HH:MM:SS]."
+            ),
+            'clips': (
+                "Identify the 3 most interesting, viral, or high-value 30-60 second segments from this video. "
+                "In your descriptions, follow 'The Elements of Style' (1918): "
+                "use active voice, be specific, and omit needless words. "
+                "For each, provide:\n"
+                "1. A catchy title.\n"
+                "2. Start and End timestamps (format: HH:MM:SS-HH:MM:SS).\n"
+                "3. A brief reason why it's a great clip.\n"
+                "Return ONLY the data in this format:\n"
+                "CLIP:[Title]|[HH:MM:SS-HH:MM:SS]|[Reason]\n"
+                "After the CLIP: lines, you may provide a brief markdown summary of why these clips represent the essence of the video, "
+                "maintaining a concise, vigorous style."
+            )
+        }
+        
+        system_prompt = prompts.get(mode, prompts['outline'])
+        prompt = f"""
+I have a transcript of a YouTube video. {system_prompt}
 
-        # 2. Best mode
-        best_mode = client.determine_best_mode(outline)
-        print(f"\n--- GENERATING ADDITIONAL CONTENT ({best_mode.upper()}) ---")
-        additional = client.generate_content(segments, mode=best_mode)
-        with open(os.path.join(project_path, f"TUBE2TXT-{best_mode.upper()}.md"), 'w', encoding='utf-8') as f:
-            f.write(additional)
-        for line in additional.split('\n'):
-            if line.startswith('CLIP:'):
-                print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
-            else:
-                print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
+Transcript:
+{full_transcript}
+"""
+        response = self.client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        return response.text
 
-        # 3. Explicit clips
-        if mode == 'clips':
-            print("\n--- GENERATING CLIPS ---")
-            clips_content = client.generate_content(segments, mode='clips')
-            with open(os.path.join(project_path, "TUBE2TXT-CLIPS.md"), 'w', encoding='utf-8') as f:
-                f.write(clips_content)
-            
-            clip_ranges = []
-            for line in clips_content.split('\n'):
-                if line.startswith('CLIP:'):
-                    print(f"{CLI_COLOR_CYAN}[CLIP] {line[5:]}{CLI_COLOR_RESET}")
-                    clip_ranges.append(line.split('|')[1])
+    def determine_best_mode(self, outline):
+        prompt = f"""
+Based on the following video outline, determine which of these three modes is most appropriate for a deep-dive:
+1. 'recipe' (if it's a cooking video or contains a recipe)
+2. 'technical' (if it's about coding, engineering, or complex systems)
+3. 'notes' (if it's an educational talk, lecture, or general information)
+
+Outline:
+{outline}
+
+Return ONLY the word: 'recipe', 'technical', or 'notes'.
+"""
+        response = self.client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        mode = response.text.strip().lower()
+        if 'recipe' in mode: return 'recipe'
+        if 'technical' in mode: return 'technical'
+        return 'notes'
+
+class VTTParser:
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.segments = []
+
+    def parse(self):
+        with open(self.file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Simple VTT parsing logic
+        lines = content.strip().split('\n')
+        current_start = None
+        current_text = []
+        in_header = True
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            if in_header:
+                if '-->' in line:
+                    in_header = False
                 else:
-                    print(f"{CLI_COLOR_CYAN}{line}{CLI_COLOR_RESET}")
-            
-            # Extract AI clips
-            if clip_ranges:
-                print("Extracting AI-recommended clips...")
-                for r in clip_ranges:
-                    start, end = r.split('-')
-                    out_name = f"clip_{start.replace(':','-')}_{end.replace(':','-')}.mp4"
-                    os.makedirs(os.path.join(project_path, "clips"), exist_ok=True)
-                    ClippingEngine.extract_clip(
-                        os.path.join(project_path, video_file), 
-                        start, end, 
-                        os.path.join(project_path, "clips", out_name)
-                    )
+                    continue
 
-    # Extract images in parallel
-    print(f"Extracting images in parallel ({parallel} processes)...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
-        futures = []
-        for seg in segments:
-            ts = seg['start']
-            ts_filename = ts.replace(':', '-').replace('.', '-')
-            img_path = os.path.join(project_path, "images", f"{ts_filename}.jpg")
-            if not os.path.exists(img_path):
-                futures.append(executor.submit(
-                    extract_single_image, 
-                    os.path.join(project_path, video_file), 
-                    ts, img_path
-                ))
-        concurrent.futures.wait(futures)
-    
-    print(f"Finished: {slug}")
-    return project_path
+            match = re.search(r'(\d\d:\d\d:\d\d\.\d\d\d) --> (\d\d:\d\d:\d\d\.\d\d\d)', line)
+            if match:
+                if current_start and current_text:
+                    self.segments.append({
+                        'start': current_start,
+                        'text': ' '.join(current_text),
+                        'seconds': self.to_seconds(current_start)
+                    })
+                current_start = match.group(1)
+                current_text = []
+            else:
+                # Basic cleaning of VTT tags like <c>
+                line = re.sub(r'<[^>]+>', '', line)
+                if line and not line.isdigit():
+                    current_text.append(line)
+
+        # Add last segment
+        if current_start and current_text:
+            self.segments.append({
+                'start': current_start,
+                'text': ' '.join(current_text),
+                'seconds': self.to_seconds(current_start)
+            })
+
+        # Deduplicate consecutive identical text segments (common in auto-subs)
+        deduped = []
+        last_text = None
+        for seg in self.segments:
+            if seg['text'] != last_text:
+                deduped.append(seg)
+                last_text = seg['text']
+        self.segments = deduped
+        return self.segments
+
+    def to_seconds(self, timestamp):
+        parts = timestamp.split(':')
+        h, m, s = float(parts[0]), float(parts[1]), float(parts[2])
+        return int(h * 3600 + m * 60 + s)
+
+class HTMLGenerator:
+    def __init__(self, segments, video_url, slug):
+        self.segments = segments
+        self.video_url = video_url
+        self.slug = slug
+
+    def generate(self, output_file):
+        html_content = f"""<html>
+<head>
+ <link rel="stylesheet" type="text/css" href="styles.css" />
+ </head>
+<body>
+<h1>Youtube transcript: {self.slug}</h1>
+Source: <a href="{self.video_url}" target="_blank">{self.video_url}</a>
+<ul>
+"""
+        for seg in self.segments:
+            ts_filename = seg['start'].replace(':', '-').replace('.', '-')
+            html_content += f"""<li>
+    <div class="grab"><img src="images/{ts_filename}.jpg" /></div>
+    <div class="subtitle">
+        <span id="{seg['start']}">{seg['text']}</span>
+        <a href="{self.video_url}&t={seg['seconds']}" target="_blank" class="videolink">#</a>
+    </div>
+</li>
+"""
+        html_content += """
+</ul>
+</body>
+</html>"""
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
 
 def download_video(url, output_dir):
     """Download video and subtitles using yt-dlp. Returns (video_file, vtt_file) or (None, None)."""
@@ -311,7 +429,7 @@ def main():
     if args.clip and args.video_file:
         clip_match = re.match(r'^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)-(\d{2}:\d{2}:\d{2}(?:\.\d+)?)$', args.clip)
         if not clip_match:
-            print(f"Error: Invalid format {args.clip}")
+            print(f"Error: Invalid clip range format '{args.clip}'. Expected HH:MM:SS-HH:MM:SS")
             sys.exit(1)
         start, end = clip_match.group(1), clip_match.group(2)
         output_name = f"clip_{start.replace(':','-')}_{end.replace(':','-')}.mp4"

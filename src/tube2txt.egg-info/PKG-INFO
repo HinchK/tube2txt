@@ -65,6 +65,7 @@ tube2txt.db             ← SQLite database (gitignored)
 We've included a standalone React component that provides a "Gridland" inspired terminal experience for showcasing `tube2txt` on the web.
 
 ### Features
+
 - **CRT Effect**: Authentic scanlines, flicker, and glow.
 - **Simulated CLI**: Interactive typing demo showing the `--ai` pipeline.
 - **TUI Grid**: Terminal-style feature showcase using box-drawing aesthetics.
@@ -75,9 +76,11 @@ Copy `tui/src/components/Tube2TxtShowcase.tsx` into your React/Next.js project. 
 ```tsx
 import Tube2TxtShowcase from './components/Tube2TxtShowcase';
 ```
+
 export default function Page() {
   return <Tube2TxtShowcase />;
 }
+
 ```
 
 ## API Endpoints
@@ -106,27 +109,56 @@ Send a JSON message to start processing:
 
 The server streams back `{"type": "...", "step": "...", "message": "..."}` events.
 
-## Installation
+## Installation & Deployment
 
-### Method 1: uv (Recommended)
+### Development Install (Local)
 
-```bash
-# Install Python deps into a virtual env
-uv pip install -e "."
+1. **Clone the repository:**
 
-# Test deps
-uv pip install pytest httpx
-```
+   ```bash
+   git clone https://github.com/hinchk/tube2txt.git
+   cd tube2txt
+   ```
 
-### Method 2: pip/pipx
+2. **Build the TUI Dashboard (requires Bun):**
 
-```bash
-# For global CLI access
-pipx install .
+   ```bash
+   cd tui
+   bun install
+   bun run build
+   cd ..
+   ```
 
-# Or inside a venv
-pip install .
-```
+3. **Set up Python environment (using uv):**
+
+   ```bash
+   # Create and activate venv
+   uv venv
+   source .venv/bin/activate  # macOS/Linux
+   # .venv\Scripts\activate  # Windows
+
+   # Install in editable mode
+   uv pip install -e "."
+   ```
+
+4. **Launch the Hub:**
+
+   ```bash
+   tube2txt-hub
+   ```
+
+### Deployment to Railway
+
+Tube2Txt is ready for deployment on [Railway](https://railway.app).
+
+**Configuration:**
+
+- **Builder:** Dockerfile (auto-detected via `railway.json`).
+- **Env Vars:** Set `GEMINI_API_KEY` in the Railway dashboard.
+- **Port:** Uses the dynamic `PORT` assigned by Railway.
+
+**Persistent Storage:**
+Railway ephemeral disks are wiped on redeploy. For a production-like setup, mount a volume (e.g. `/app/projects`) to persist your library and the `tube2txt.db`.
 
 After installation, three commands are available:
 

@@ -168,12 +168,34 @@ async def ws_process(websocket: WebSocket):
 def start_hub():
     """Entry point for the hub command."""
     # Serve built TUI assets at root (if available)
-    tui_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tui-dist")
+    # Search order: /app/static (Docker), ./static (local), ./tui/dist (dev fallback)
+    tui_dist = os.path.join(CWD, "static")
     if not os.path.exists(tui_dist):
-        # Fallback for development: check CWD
         tui_dist = os.path.join(CWD, "tui", "dist")
+
     if os.path.exists(tui_dist):
-        app.mount("/", StaticFiles(directory=tui_dist, html=True), name="tui")
+        print(f"Serving TUI from: {tui_dist}")
+
+        # Handle SPA fallback and static files
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str = ""):
+            # If it's an API or WS route, but we got here, it's a 404 for the API
+            if full_path.startswith("api/") or full_path.startswith("ws/"):
+                return JSONResponse(status_code=404, content={"error": "Not found"})
+
+            # Root path
+            if not full_path or full_path == "":
+                return FileResponse(os.path.join(tui_dist, "index.html"))
+
+            # Check if it's a file that exists in the dist directory
+            file_path = os.path.join(tui_dist, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+
+            # Fallback to index.html for SPA (client-side routing)
+            return FileResponse(os.path.join(tui_dist, "index.html"))
+    else:
+        print("Warning: TUI dist directory not found. Serving API only.")
 
     print(f"Starting Tube2Txt API at http://localhost:8000")
     print(f"Database: {DB_PATH}")

@@ -1,8 +1,7 @@
 import os
 import sqlite3
 import re
-from .db import Database
-from .parsers import VTTParser
+from tube2txt import Database, VTTParser
 
 # For pip-installed packages, the database and projects dir should be relative to CWD
 # unless specified via environment variables.

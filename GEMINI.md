@@ -43,11 +43,6 @@ This file serves as the system rules, context, and orientation guide for any AI 
 - `GET /api/search?q=` — Full-text search across all transcripts
 - `WS /ws/process` — WebSocket for real-time video processing
 
-**Entry points** (defined in `pyproject.toml`):
-- `tube2txt` -> `tube2txt:main`
-- `tube2txt-hub` -> `tube2txt.hub:start_hub`
-- `tube2txt-index` -> `tube2txt.index_existing:migrate`
-
 ## Strict Rules & Conventions
 
 1. **Output Directory:** All generated content goes to `projects/<slug>/`. The `.gitignore` ignores `projects/`.

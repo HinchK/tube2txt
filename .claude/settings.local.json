@@ -22,9 +22,7 @@
       "Bash(bun install:*)",
       "Bash(.venv/bin/pytest tests/test_api.py -v)",
       "Bash(bun run:*)",
-      "Bash(.venv/bin/pytest tests/ -v)",
-      "Bash(curl -s http://0.0.0.0:8000/)",
-      "Bash(curl:*)"
+      "Bash(.venv/bin/pytest tests/ -v)"
     ]
   }
 }

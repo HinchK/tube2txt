@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun run src/index.tsx",
     "build": "bun build src/index.tsx --outdir dist --target bun",
-    "build-web": "bun build src/web.tsx --outdir dist --target browser --minify"
+    "build-web": "bun build src/web.tsx --outdir dist --target browser --minify && cp index.html dist/index.html"
   },
   "dependencies": {
     "@gridland/core": "latest",
