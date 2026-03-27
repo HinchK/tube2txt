@@ -22,7 +22,9 @@
       "Bash(bun install:*)",
       "Bash(.venv/bin/pytest tests/test_api.py -v)",
       "Bash(bun run:*)",
-      "Bash(.venv/bin/pytest tests/ -v)"
+      "Bash(.venv/bin/pytest tests/ -v)",
+      "mcp__Desktop_Commander__list_directory",
+      "Bash(du -sh /Users/hinchk/code/apps/TubedToText/projects/*/)"
     ]
   }
 }
