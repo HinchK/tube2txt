@@ -418,7 +418,7 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
     return project_path
 
 
-def main():
+def get_parser():
     parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
     parser.add_argument("slug_or_url", nargs="?", help="Project slug or YouTube URL")
     parser.add_argument("url", nargs="?", help="YouTube video URL (if slug provided)")
@@ -430,7 +430,11 @@ def main():
     parser.add_argument("--projects-dir", default="projects", help="Directory for output")
     parser.add_argument("--clip", help="Manual clip: START-END")
     parser.add_argument("--video-file", help="Video file for manual clipping")
+    return parser
 
+
+def main():
+    parser = get_parser()
     args = parser.parse_args()
 
     # Manual Clipping

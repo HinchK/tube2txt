@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-from tube2txt import process_video, Database
+from tube2txt import process_video, Database, get_parser
 
 CWD = os.getcwd()
 DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
@@ -150,45 +150,45 @@ async def ws_process(websocket: WebSocket):
                 # Parse the command safely
                 parsed_args = shlex.split(command)
                 
-                # If they included "tube2txt" at the start, replace it with module execution
+                # If they included "tube2txt" at the start, remove it
                 if parsed_args and parsed_args[0] == "tube2txt":
-                    parsed_args = [sys.executable, "-m", "tube2txt"] + parsed_args[1:]
-                elif parsed_args and parsed_args[0] != sys.executable:
-                    parsed_args = [sys.executable, "-m", "tube2txt"] + parsed_args
-
-                def run_cmd():
-                    # Run as a subprocess, capture stdout/stderr
-                    process = subprocess.Popen(
-                        parsed_args,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=1
-                    )
-                    
-                    for line in process.stdout:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        # Send line to websocket
-                        asyncio.run_coroutine_threadsafe(
-                            websocket.send_json({"type": "status", "message": line}),
-                            loop,
-                        )
-                        
-                    process.wait()
-                    if process.returncode == 0:
-                        asyncio.run_coroutine_threadsafe(
-                            websocket.send_json({"type": "complete", "message": "Job finished successfully."}),
-                            loop,
-                        )
+                    parsed_args = parsed_args[1:]
+                
+                # Use the project's own parser
+                parser = get_parser()
+                args, unknown = parser.parse_known_args(parsed_args)
+                
+                # Resolve URL and slug exactly like main()
+                url = args.url
+                slug = args.slug_or_url
+                if not url:
+                    if slug and (slug.startswith("http") or len(slug) == 11):
+                        url = slug
+                        slug = "default"
                     else:
-                        asyncio.run_coroutine_threadsafe(
-                            websocket.send_json({"type": "error", "message": f"Process exited with code {process.returncode}"}),
-                            loop,
-                        )
+                        raise ValueError("Missing URL in command")
 
-                await loop.run_in_executor(None, run_cmd)
+                project_path = os.path.join(PROJECTS_DIR, slug)
+
+                def on_progress(type_, step, message):
+                    asyncio.run_coroutine_threadsafe(
+                        websocket.send_json({"type": type_, "step": step, "message": message}),
+                        loop,
+                    )
+
+                await loop.run_in_executor(
+                    None,
+                    lambda: process_video(
+                        url=url,
+                        slug=slug,
+                        mode=args.mode,
+                        ai_flag=args.ai,
+                        db_path=args.db,
+                        project_path=project_path,
+                        parallel=args.parallel,
+                        on_progress=on_progress,
+                    ),
+                )
             except Exception as e:
                 await websocket.send_json({"type": "error", "message": str(e)})
             finally:
@@ -202,12 +202,28 @@ async def ws_process(websocket: WebSocket):
 def start_hub():
     """Entry point for the hub command."""
     # Serve built TUI assets at root (if available)
-    # Search order: /app/static (Docker), ./static (local), ./tui/dist (dev fallback)
-    tui_dist = os.path.join(CWD, "static")
-    if not os.path.exists(tui_dist):
-        tui_dist = os.path.join(CWD, "tui", "dist")
+    # Search order:
+    # 1. TUBE2TXT_TUI_DIR env var
+    # 2. ./static (relative to CWD)
+    # 3. ../../tui/dist (relative to this file, for dev)
+    # 4. ./tui/dist (relative to CWD)
+    
+    tui_dist = os.environ.get("TUBE2TXT_TUI_DIR")
+    
+    if not tui_dist:
+        # Check relative to CWD
+        paths_to_check = [
+            os.path.join(CWD, "static"),
+            os.path.join(CWD, "tui", "dist"),
+            # Check relative to this file (src/tube2txt/hub.py -> tui/dist)
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tui", "dist")
+        ]
+        for p in paths_to_check:
+            if os.path.exists(p):
+                tui_dist = p
+                break
 
-    if os.path.exists(tui_dist):
+    if tui_dist and os.path.exists(tui_dist):
         print(f"Serving TUI from: {tui_dist}")
 
         # Handle SPA fallback and static files
