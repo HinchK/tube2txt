@@ -21,6 +21,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DB_PATH="$ROOT/tube2txt.db"
 PROJECTS_DIR="$ROOT/projects"
 DEST="$ROOT/backups"
+
 MODE="db-only"
 DRY_RUN=false
 
@@ -38,7 +39,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")cd ..
 ARCHIVE_NAME="tube2txt-backup-${TIMESTAMP}.tar.gz"
 ARCHIVE_PATH="$DEST/$ARCHIVE_NAME"
 
@@ -78,31 +79,4 @@ if $DRY_RUN; then
   for src in "${TAR_SOURCES[@]}"; do
     full="$ROOT/$src"
     if [[ -f "$full" ]]; then
-      size=$(stat -f%z "$full" 2>/dev/null || stat -c%s "$full" 2>/dev/null || echo 0)
-      echo "  $src  ($((size / 1024)) KB)"
-    elif [[ -d "$full" ]]; then
-      size=$(du -sh "$full" 2>/dev/null | awk '{print $1}')
-      echo "  $src/  ($size)"
-    fi
-  done
-  exit 0
-fi
-
-cd "$ROOT"
-tar -czf "$ARCHIVE_PATH" "${EXCLUDE_ARGS[@]}" "${TAR_SOURCES[@]}"
-
-ARCHIVE_SIZE=$(du -sh "$ARCHIVE_PATH" | awk '{print $1}')
-echo "Backup created: $ARCHIVE_PATH  ($ARCHIVE_SIZE)"
-
-# Prune old backups — keep last 10
-echo ""
-echo "Pruning old backups (keeping last 10)..."
-mapfile -t old_backups < <(ls -t "$DEST"/tube2txt-backup-*.tar.gz 2>/dev/null | tail -n +11)
-if [[ ${#old_backups[@]} -gt 0 ]]; then
-  for f in "${old_backups[@]}"; do
-    echo "  Removing old backup: $(basename "$f")"
-    rm -f "$f"
-  done
-else
-  echo "  Nothing to prune."
-fi
+      size=$ 
