@@ -8,17 +8,24 @@ interface Message {
 
 export function TerminalLog({ messages }: { messages: Message[] }) {
   return (
-    <scrollbox flexGrow={1} borderStyle="single">
+    <div className="flex flex-col gap-1">
       {messages.map((msg, i) => {
         const prefix = msg.type === "error" ? "!" : ">";
-        const color = msg.type === "error" ? "red" : msg.type === "complete" ? "green" : "cyan";
+        const colorClass = 
+          msg.type === "error" ? "text-red-500" : 
+          msg.type === "complete" ? "text-emerald-500" : 
+          "text-cyan-400";
+        
         return (
-          <text key={i} color={color}>
-            {prefix} {msg.message || ""}
-          </text>
+          <div key={i} className={`${colorClass} whitespace-pre-wrap`}>
+            <span className="opacity-50 mr-2">{prefix}</span>
+            {msg.message || ""}
+          </div>
         );
       })}
-      {messages.length === 0 && <text dimColor>Waiting for job...</text>}
-    </scrollbox>
+      {messages.length === 0 && (
+        <div className="text-zinc-600 italic">Waiting for job...</div>
+      )}
+    </div>
   );
 }
