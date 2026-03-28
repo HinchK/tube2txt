@@ -156,6 +156,25 @@ docker compose up hub
 docker compose run tube2txt tube2txt my-video "https://youtube.com/watch?v=..." --ai
 ```
 
+## Troubleshooting
+
+### `sqlite3.OperationalError: unable to open database file`
+This often occurs if a directory named `tube2txt.db` exists in your project root. Ensure `tube2txt.db` is a file, or delete the empty directory if it was created by mistake:
+```bash
+rm -rf tube2txt.db
+```
+
+### `ffmpeg` Image Extraction Failures
+If you see errors like `Non full-range YUV is non-standard` or encoder failures during the "Extracting images" step, ensure your `ffmpeg` is up to date. Tube2Txt uses the `-strict -2` flag to improve compatibility with MJPEG encoders.
+
+### `NameError: name 'VTTParser' is not defined`
+If you encounter this after a recent update, your installed package might be out of sync. Reinstall the package from source:
+```bash
+pipx install . --force
+# Or if using uv:
+uv pip install -e "."
+```
+
 ## Usage
 
 ### Process a Video

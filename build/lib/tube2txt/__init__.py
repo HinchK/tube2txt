@@ -27,6 +27,13 @@ class Database:
         self.init_db()
 
     def init_db(self):
+        # Robustness check: Ensure db_path isn't a directory
+        if os.path.isdir(self.db_path):
+            raise RuntimeError(
+                f"Cannot initialize database: '{self.db_path}' is a directory. "
+                "Please delete the directory or choose a different database path."
+            )
+        
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -300,6 +307,7 @@ def _extract_single_image(video_path, ts, output_path):
     cmd = [
         "ffmpeg", "-ss", ts, "-nostdin", "-i", video_path,
         "-frames:v", "1", "-q:v", "2", "-vf", "scale=1024:-1",
+        "-strict", "-2",
         output_path, "-loglevel", "error", "-y"
     ]
     try:

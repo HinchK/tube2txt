@@ -4,7 +4,7 @@
 
 ```bash
 git clone <repo-url>
-cd TubedToText
+cd PATIENCE-HAMMER-BOOBS
 
 # Python backend
 uv pip install -e "."

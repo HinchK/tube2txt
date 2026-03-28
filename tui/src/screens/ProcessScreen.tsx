@@ -2,13 +2,6 @@ import React, { useState } from "react";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { TerminalLog } from "../components/TerminalLog";
 
-const MODES = [
-  { label: "outline", value: "outline" },
-  { label: "notes", value: "notes" },
-  { label: "recipe", value: "recipe" },
-  { label: "technical", value: "technical" },
-  { label: "clips", value: "clips" },
-];
 const WS_URL = "ws://localhost:8000/ws/process";
 
 interface Props {
@@ -16,9 +9,7 @@ interface Props {
 }
 
 export function ProcessScreen({ onWsStatusChange }: Props) {
-  const [url, setUrl] = useState("");
-  const [slug, setSlug] = useState("");
-  const [modeIdx, setModeIdx] = useState(0);
+  const [command, setCommand] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const { send, messages, status, clearMessages } = useWebSocket(WS_URL);
 
@@ -32,26 +23,28 @@ export function ProcessScreen({ onWsStatusChange }: Props) {
   }, [messages]);
 
   const startJob = () => {
-    if (!url || !slug || isRunning) return;
+    if (!command || isRunning) return;
     clearMessages();
     setIsRunning(true);
-    send({ action: "start", slug, url, ai: true, mode: MODES[modeIdx].value });
+    
+    let finalCommand = command.trim();
+    if (finalCommand.startsWith("http") && !finalCommand.includes(" ")) {
+      finalCommand = `tube2txt hub "${finalCommand}" --ai --mode recipe`;
+    }
+    
+    send({ action: "start", command: finalCommand });
   };
 
   return (
     <box flexDirection="column" flexGrow={1}>
       <box flexDirection="column" gap={1}>
         <box>
-          <text>URL:  </text>
-          <input value={url} onChange={setUrl} placeholder="https://youtube.com/watch?v=..." />
-        </box>
-        <box>
-          <text>Slug: </text>
-          <input value={slug} onChange={setSlug} placeholder="my-video" />
-        </box>
-        <box>
-          <text>Mode: </text>
-          <select options={MODES} onChange={(idx) => setModeIdx(idx)} />
+          <text>Command or URL: </text>
+          <input 
+            value={command} 
+            onChange={setCommand} 
+            placeholder='https://... OR tube2txt my-vid "https://..." --ai' 
+          />
         </box>
         <box>
           <text

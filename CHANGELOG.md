@@ -4,6 +4,14 @@ All notable changes to Tube2Txt are documented here.
 
 ---
 
+## [3.2.1] — 2026-03-28
+
+### Fixed
+- **Ffmpeg MJPEG encoder** — added `-strict -2` to image extraction to resolve "Non full-range YUV is non-standard" errors on some systems.
+- **Database initialization** — added check to prevent `tube2txt.db` from being a directory, which was causing `sqlite3.OperationalError`.
+
+---
+
 ## [3.2.0] — 2026-03-25
 
 ### Added
