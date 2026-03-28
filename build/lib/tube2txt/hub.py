@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-from tube2txt import process_video
+from tube2txt import process_video, Database
 
 CWD = os.getcwd()
 DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
@@ -24,6 +24,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ensure schema exists before serving any requests
+Database(DB_PATH)
+
+
+@app.get("/healthcheck")
+async def healthcheck():
+    return {"status": "ok"}
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -197,10 +206,15 @@ def start_hub():
     else:
         print("Warning: TUI dist directory not found. Serving API only.")
 
-    print(f"Starting Tube2Txt API at http://localhost:8000")
+    # Ensure database is initialized
+    print(f"Initializing database at {DB_PATH}")
+    Database(DB_PATH)
+
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Starting Tube2Txt API at http://0.0.0.0:{port}")
     print(f"Database: {DB_PATH}")
     print(f"Projects: {PROJECTS_DIR}")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
