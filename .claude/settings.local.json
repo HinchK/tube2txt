@@ -24,7 +24,8 @@
       "Bash(bun run:*)",
       "Bash(.venv/bin/pytest tests/ -v)",
       "mcp__Desktop_Commander__list_directory",
-      "Bash(du -sh /Users/hinchk/code/apps/TubedToText/projects/*/)"
+      "Bash(du -sh /Users/hinchk/code/apps/TubedToText/projects/*/)",
+      "Bash(uv run:*)"
     ]
   }
 }

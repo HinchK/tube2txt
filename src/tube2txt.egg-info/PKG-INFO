@@ -216,8 +216,8 @@ Output goes to `projects/my-video/`:
 
 ```bash
 tube2txt-hub
-# Open http://localhost:8000 in a browser, or the Gridland TUI connects automatically
 ```
+**Note:** You MUST restart the `tube2txt-hub` process after modifying the backend or building the TUI to see changes at `http://0.0.0.0:8000`.
 
 ### TUI Development
 
@@ -228,7 +228,7 @@ cd tui && bun install && bun run dev
 ### Build TUI for Production
 
 ```bash
-cd tui && bun run build
+cd tui && bun run build-web
 # Output goes to tui/dist/, served at / by tube2txt-hub
 ```
 
@@ -267,7 +267,7 @@ tube2txt-index
 ## Running Tests
 
 ```bash
-.venv/bin/pytest tests/ -v
+python -m pytest tests/ -v
 ```
 
 ## Windows

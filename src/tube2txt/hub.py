@@ -1,9 +1,12 @@
 import os
+import sys
 import re
 import json
 import sqlite3
+import shlex
 import asyncio
 import threading
+import subprocess
 import uvicorn
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
@@ -140,30 +143,52 @@ async def ws_process(websocket: WebSocket):
             loop = asyncio.get_event_loop()
 
             try:
-                slug = data["slug"]
-                url = data["url"]
-                ai_flag = data.get("ai", False)
-                mode = data.get("mode", "outline")
-                project_path = os.path.join(PROJECTS_DIR, slug)
+                command = data.get("command")
+                if not command:
+                    raise ValueError("No command provided")
 
-                def on_progress(type_, step, message):
-                    asyncio.run_coroutine_threadsafe(
-                        websocket.send_json({"type": type_, "step": step, "message": message}),
-                        loop,
+                # Parse the command safely
+                parsed_args = shlex.split(command)
+                
+                # If they included "tube2txt" at the start, replace it with module execution
+                if parsed_args and parsed_args[0] == "tube2txt":
+                    parsed_args = [sys.executable, "-m", "tube2txt"] + parsed_args[1:]
+                elif parsed_args and parsed_args[0] != sys.executable:
+                    parsed_args = [sys.executable, "-m", "tube2txt"] + parsed_args
+
+                def run_cmd():
+                    # Run as a subprocess, capture stdout/stderr
+                    process = subprocess.Popen(
+                        parsed_args,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1
                     )
+                    
+                    for line in process.stdout:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        # Send line to websocket
+                        asyncio.run_coroutine_threadsafe(
+                            websocket.send_json({"type": "status", "message": line}),
+                            loop,
+                        )
+                        
+                    process.wait()
+                    if process.returncode == 0:
+                        asyncio.run_coroutine_threadsafe(
+                            websocket.send_json({"type": "complete", "message": "Job finished successfully."}),
+                            loop,
+                        )
+                    else:
+                        asyncio.run_coroutine_threadsafe(
+                            websocket.send_json({"type": "error", "message": f"Process exited with code {process.returncode}"}),
+                            loop,
+                        )
 
-                await loop.run_in_executor(
-                    None,
-                    lambda: process_video(
-                        url=url,
-                        slug=slug,
-                        mode=mode,
-                        ai_flag=ai_flag,
-                        db_path=DB_PATH,
-                        project_path=project_path,
-                        on_progress=on_progress,
-                    ),
-                )
+                await loop.run_in_executor(None, run_cmd)
             except Exception as e:
                 await websocket.send_json({"type": "error", "message": str(e)})
             finally:

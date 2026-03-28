@@ -34,3 +34,9 @@ tube2txt-index = "tube2txt.index_existing:migrate"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["tube2txt*"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=8.4.2",
+]

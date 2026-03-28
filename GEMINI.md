@@ -50,6 +50,8 @@ This file serves as the system rules, context, and orientation guide for any AI 
 3. **Progress Callback:** `process_video()` accepts `on_progress(type, step, message)`. When None, it prints (CLI mode). When provided, it streams to WebSocket.
 4. **Environment Variables:** `GEMINI_API_KEY` in `.env` (auto-loaded). `TUBE2TXT_DB` for custom DB path.
 5. **Error Handling:** Don't fail silently. Print clear errors and return None/False on failure.
+6. **Hub Restarts:** After making any changes to `src/tube2txt/hub.py` or the TUI, the `tube2txt-hub` process (hosting `0.0.0.0:8000`) MUST be killed and restarted to reflect changes.
+7. **Testing:** Always use `python -m pytest` to run tests to ensure the local module is in the path.
 
 ## Common Commands
 
@@ -64,12 +66,8 @@ tube2txt-hub
 cd tui && bun install && bun run dev
 
 # Build TUI for production
-cd tui && bun run build
+cd tui && bun run build-web
 
 # Run tests
-.venv/bin/pytest tests/ -v
-
-# Docker
-docker compose up hub
-docker compose run tube2txt tube2txt my-video "URL" --ai
+python -m pytest tests/ -v
 ```
