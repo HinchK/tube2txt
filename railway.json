@@ -6,7 +6,6 @@
   },
   "deploy": {
     "startCommand": "python3 -m tube2txt.hub",
-    "preDeployCommand": "python3 -m tube2txt.index_existing",
     "restartPolicyType": "ON_FAILURE"
   }
 }
