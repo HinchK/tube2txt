@@ -16,10 +16,44 @@ except ImportError:
     pass
 from google import genai
 from google.genai import types
+from youtube_transcript_api import YouTubeTranscriptApi
 
 # Constants for terminal coloring
 CLI_COLOR_CYAN = "\033[36m"
 CLI_COLOR_RESET = "\033[0m"
+
+def get_video_id(url):
+    """Extract the 11-character video ID from various YouTube URL formats."""
+    if len(url) == 11:
+        return url
+    
+    patterns = [
+        r"(?:v=|\/)([0-9A-Za-z_-]{11}).*",
+        r"youtu\.be\/([0-9A-Za-z_-]{11})",
+        r"embed\/([0-9A-Za-z_-]{11})",
+        r"shorts\/([0-9A-Za-z_-]{11})"
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def fetch_transcript_api(video_id, languages=['en', 'de']):
+    """Uses YouTubeTranscriptApi.get_transcript to fetch the transcript."""
+    try:
+        return YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+    except Exception as e:
+        print(f"Error fetching transcript via API: {e}")
+        return None
+
+def format_vtt_timestamp(seconds):
+    """Converts float/int seconds into the VTT-style HH:MM:SS.mmm format."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
 class Database:
     def __init__(self, db_path="tube2txt.db"):
