@@ -306,7 +306,8 @@ cmd.extend(["--cookies-from-browser chrome -cookies cookies.txt"])
     #     _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
     #     cmd.extend(["--cookies-from-browser chrome -cookies", cookies_path])
 
-    cmd.append(url)
+cmd.append(url)
+
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         if result.stdout:
