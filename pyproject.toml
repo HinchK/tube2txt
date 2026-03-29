@@ -24,6 +24,7 @@ dependencies = [
     "uvicorn",
     "yt-dlp",
     "websockets",
+    "youtube-transcript-api",
 ]
 
 [project.scripts]
