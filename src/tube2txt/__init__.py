@@ -40,8 +40,21 @@ def get_video_id(url):
             return match.group(1)
     return None
 
+def load_cookies_to_session(session, cookies_path):
+    """Load Netscape-format cookies.txt into a requests.Session."""
+    import http.cookiejar
+    if cookies_path and os.path.exists(cookies_path):
+        try:
+            cj = http.cookiejar.MozillaCookieJar(cookies_path)
+            cj.load(ignore_discard=True, ignore_expires=True)
+            session.cookies.update(cj)
+            return True
+        except Exception as e:
+            print(f"Error loading cookies from {cookies_path}: {e}")
+    return False
+
 def fetch_transcript_api(video_id, languages=['en', 'de']):
-    """Uses YouTubeTranscriptApi.fetch to fetch the transcript."""
+    """Uses YouTubeTranscriptApi.fetch to fetch the transcript, with proxy and cookie support."""
     from youtube_transcript_api import (
         YouTubeTranscriptApi, 
         IpBlocked, 
@@ -49,9 +62,44 @@ def fetch_transcript_api(video_id, languages=['en', 'de']):
         TranscriptsDisabled,
         NoTranscriptFound
     )
+    from youtube_transcript_api.proxies import GenericProxyConfig
+    import requests
+
+    session = requests.Session()
+    
+    # Try to load cookies from standard locations
+    cookies_path = os.environ.get("YT_DLP_COOKIES")
+    if not cookies_path:
+        possible_paths = [
+            os.path.join(os.getcwd(), "cookies.txt"),
+            os.path.join(os.getcwd(), "src", "cookies.txt"),
+            os.path.join(os.getcwd(), "projects", "cookies.txt")
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                cookies_path = p
+                break
+    
+    if cookies_path:
+        if load_cookies_to_session(session, cookies_path):
+            print(f"Transcript API: Loaded cookies from {cookies_path}")
+
+    # Support proxies via environment variables
+    proxy_config = None
+    http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
+    https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    
+    if http_proxy or https_proxy:
+        proxy_config = GenericProxyConfig(
+            http_url=http_proxy,
+            https_url=https_proxy or http_proxy
+        )
+        print(f"Transcript API: Using proxy configuration.")
+
     try:
-        # Create an instance and call fetch
-        transcript = YouTubeTranscriptApi().fetch(video_id, languages=languages)
+        # Create an instance with our custom session and proxy config
+        ytt_api = YouTubeTranscriptApi(http_client=session, proxy_config=proxy_config)
+        transcript = ytt_api.fetch(video_id, languages=languages)
         return transcript.to_raw_data()
     except (IpBlocked, RequestBlocked):
         print(f"Transcript API: IP is blocked or request rate-limited by YouTube.")
