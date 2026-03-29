@@ -28,9 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure schema exists before serving any requests
-Database(DB_PATH)
-
 
 @app.get("/healthcheck")
 async def healthcheck():
