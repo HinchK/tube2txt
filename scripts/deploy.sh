@@ -79,7 +79,7 @@ local)
   $NO_CACHE && BUILD_ARGS+=("--no-cache")
 
   echo "── Building Docker image ────────────────────────────────"
-  run docker compose build "${BUILD_ARGS[@]}" hub
+  run docker compose build "${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"}" hub
 
   echo ""
   echo "── Starting hub service ─────────────────────────────────"
@@ -112,7 +112,7 @@ docker)
   $NO_CACHE && BUILD_ARGS+=("--no-cache")
 
   echo "── Building image: $IMAGE ───────────────────────────────"
-  run docker build "${BUILD_ARGS[@]}" .
+  run docker build "${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"}" .
 
   echo ""
   echo "── Pushing to registry ──────────────────────────────────"
