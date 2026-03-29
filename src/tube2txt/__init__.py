@@ -277,7 +277,7 @@ Source: <a href="{self.video_url}" target="_blank">{self.video_url}</a>
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
-def download_video(url, output_dir):
+def download_video(url, output_dir, on_progress=None):
     """Download video and subtitles using yt-dlp. Returns (video_file, vtt_file) or (None, None)."""
     os.makedirs(output_dir, exist_ok=True)
     cmd = [
@@ -287,9 +287,21 @@ def download_video(url, output_dir):
         url
     ]
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        if result.stdout:
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    _notify(on_progress, "status", "download", f"yt-dlp: {line}")
+    except subprocess.CalledProcessError as e:
+        error_msg = f"yt-dlp failed (code {e.returncode})"
+        if e.stderr:
+            error_msg += f": {e.stderr.strip()}"
+        elif e.stdout:
+            error_msg += f": {e.stdout.strip()}"
+        _notify(on_progress, "error", "download", f"Error downloading: {error_msg}")
+        return None, None
     except Exception as e:
-        print(f"Error downloading: {e}")
+        _notify(on_progress, "error", "download", f"Unexpected error during download: {e}")
         return None, None
 
     # Find downloaded files
@@ -352,9 +364,8 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
 
     # 1. Download
     _notify(on_progress, "status", "download", "Downloading video and subtitles...")
-    video_file, vtt_file = download_video(url, project_path)
+    video_file, vtt_file = download_video(url, project_path, on_progress=on_progress)
     if not video_file or not vtt_file:
-        _notify(on_progress, "error", "download", f"Failed to download video or subtitles for {slug}")
         return None
 
     # 2. Parse VTT
