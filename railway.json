@@ -5,8 +5,8 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "tube2txt-hub",
-    "preDeployCommand": "tube2txt-index",
+    "startCommand": "python3 -m tube2txt.hub",
+    "preDeployCommand": "python3 -m tube2txt.index_existing",
     "restartPolicyType": "ON_FAILURE"
   }
 }

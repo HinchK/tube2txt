@@ -18,6 +18,7 @@ from tube2txt import process_video, Database, get_parser
 CWD = os.getcwd()
 DB_PATH = os.environ.get("TUBE2TXT_DB", os.path.join(CWD, "tube2txt.db"))
 PROJECTS_DIR = os.path.join(CWD, "projects")
+TUI_DIST_DIR = os.environ.get("TUBE2TXT_TUI_DIR")
 
 app = FastAPI(title="Tube2Txt API")
 
@@ -29,9 +30,30 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup_event():
+    print(f"--- Tube2Txt Hub Starting ---")
+    print(f"CWD: {CWD}")
+    print(f"Database Path: {DB_PATH}")
+    print(f"Projects Dir: {PROJECTS_DIR}")
+    
+    # Ensure database is initialized
+    try:
+        Database(DB_PATH)
+        print("✓ Database initialized")
+    except Exception as e:
+        print(f"× Database initialization failed: {e}")
+        # We don't exit here to allow healthcheck to still run
+    
+    # Ensure projects dir exists
+    if not os.path.exists(PROJECTS_DIR):
+        os.makedirs(PROJECTS_DIR, exist_ok=True)
+        print(f"✓ Created projects directory at {PROJECTS_DIR}")
+
+
 @app.get("/healthcheck")
 async def healthcheck():
-    return {"status": "ok"}
+    return {"status": "ok", "db": DB_PATH}
 
 
 def get_db():
@@ -46,49 +68,55 @@ if os.path.exists(PROJECTS_DIR):
 
 @app.get("/api/videos")
 async def get_videos():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT slug, url, title, processed_at FROM videos ORDER BY processed_at DESC")
-    videos = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return videos
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT slug, url, title, processed_at FROM videos ORDER BY processed_at DESC")
+        videos = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return videos
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.get("/api/videos/{slug}")
 async def get_video_detail(slug: str):
-    conn = get_db()
-    cursor = conn.cursor()
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
 
-    # Get video
-    cursor.execute("SELECT slug, url, title, processed_at FROM videos WHERE slug = ?", (slug,))
-    video = cursor.fetchone()
-    if not video:
+        # Get video
+        cursor.execute("SELECT slug, url, title, processed_at FROM videos WHERE slug = ?", (slug,))
+        video = cursor.fetchone()
+        if not video:
+            conn.close()
+            return JSONResponse(status_code=404, content={"error": "Video not found"})
+
+        video = dict(video)
+
+        # Get segments
+        cursor.execute(
+            "SELECT start_ts, seconds, text FROM segments WHERE video_id = (SELECT id FROM videos WHERE slug = ?) ORDER BY seconds",
+            (slug,),
+        )
+        video["segments"] = [dict(row) for row in cursor.fetchall()]
         conn.close()
-        return JSONResponse(status_code=404, content={"error": "Video not found"})
 
-    video = dict(video)
+        # Read AI files from disk
+        project_dir = os.path.join(PROJECTS_DIR, slug)
+        ai_files = []
+        if os.path.exists(project_dir):
+            import glob
+            for md_path in sorted(glob.glob(os.path.join(project_dir, "TUBE2TXT-*.md"))):
+                name = re.search(r"TUBE2TXT-(.+)\.md$", os.path.basename(md_path))
+                if name:
+                    with open(md_path, "r", encoding="utf-8") as f:
+                        ai_files.append({"name": name.group(1), "content": f.read()})
+        video["ai_files"] = ai_files
 
-    # Get segments
-    cursor.execute(
-        "SELECT start_ts, seconds, text FROM segments WHERE video_id = (SELECT id FROM videos WHERE slug = ?) ORDER BY seconds",
-        (slug,),
-    )
-    video["segments"] = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-
-    # Read AI files from disk
-    project_dir = os.path.join(PROJECTS_DIR, slug)
-    ai_files = []
-    if os.path.exists(project_dir):
-        import glob
-        for md_path in sorted(glob.glob(os.path.join(project_dir, "TUBE2TXT-*.md"))):
-            name = re.search(r"TUBE2TXT-(.+)\.md$", os.path.basename(md_path))
-            if name:
-                with open(md_path, "r", encoding="utf-8") as f:
-                    ai_files.append({"name": name.group(1), "content": f.read()})
-    video["ai_files"] = ai_files
-
-    return video
+        return video
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.get("/api/videos/{slug}/images/{filename}")
@@ -101,21 +129,24 @@ async def get_video_image(slug: str, filename: str):
 
 @app.get("/api/search")
 async def search(q: str = Query(...)):
-    conn = get_db()
-    cursor = conn.cursor()
-    query = """
-        SELECT s.start_ts, s.seconds, s.text, s.thumbnail_path, v.slug, v.title
-        FROM segments s
-        JOIN videos v ON s.video_id = v.id
-        WHERE s.id IN (
-            SELECT segment_id FROM segments_search WHERE segments_search MATCH ?
-        )
-        LIMIT 20
-    """
-    cursor.execute(query, (q,))
-    results = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return results
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT s.start_ts, s.seconds, s.text, s.thumbnail_path, v.slug, v.title
+            FROM segments s
+            JOIN videos v ON s.video_id = v.id
+            WHERE s.id IN (
+                SELECT segment_id FROM segments_search WHERE segments_search MATCH ?
+            )
+            LIMIT 20
+        """
+        cursor.execute(query, (q,))
+        results = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return results
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 _job_lock = threading.Lock()
@@ -196,63 +227,53 @@ async def ws_process(websocket: WebSocket):
         pass
 
 
+# TUI Asset Detection & Mounting
+tui_dist = TUI_DIST_DIR
+if not tui_dist:
+    paths_to_check = [
+        os.path.join(CWD, "static"),
+        os.path.join(CWD, "tui", "dist"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tui", "dist")
+    ]
+    for p in paths_to_check:
+        if os.path.exists(p):
+            tui_dist = p
+            break
+
+if tui_dist and os.path.exists(tui_dist):
+    print(f"✓ Found TUI assets at: {tui_dist}")
+    
+    # Handle SPA fallback and static files
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str = ""):
+        # If it's an API or WS route, but we got here, it's a 404 for the API
+        if full_path.startswith("api/") or full_path.startswith("ws/"):
+            return JSONResponse(status_code=404, content={"error": "Not found"})
+
+        # Check if it's a file that exists in the dist directory
+        file_path = os.path.join(tui_dist, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        # Fallback to index.html for SPA (client-side routing)
+        index_path = os.path.join(tui_dist, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        
+        return JSONResponse(status_code=404, content={"error": "index.html not found"})
+else:
+    print("! Warning: TUI dist directory not found. Serving API only.")
+
+
 def start_hub():
     """Entry point for the hub command."""
-    # Serve built TUI assets at root (if available)
-    # Search order:
-    # 1. TUBE2TXT_TUI_DIR env var
-    # 2. ./static (relative to CWD)
-    # 3. ../../tui/dist (relative to this file, for dev)
-    # 4. ./tui/dist (relative to CWD)
-    
-    tui_dist = os.environ.get("TUBE2TXT_TUI_DIR")
-    
-    if not tui_dist:
-        # Check relative to CWD
-        paths_to_check = [
-            os.path.join(CWD, "static"),
-            os.path.join(CWD, "tui", "dist"),
-            # Check relative to this file (src/tube2txt/hub.py -> tui/dist)
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tui", "dist")
-        ]
-        for p in paths_to_check:
-            if os.path.exists(p):
-                tui_dist = p
-                break
-
-    if tui_dist and os.path.exists(tui_dist):
-        print(f"Serving TUI from: {tui_dist}")
-
-        # Handle SPA fallback and static files
-        @app.get("/{full_path:path}")
-        async def serve_spa(full_path: str = ""):
-            # If it's an API or WS route, but we got here, it's a 404 for the API
-            if full_path.startswith("api/") or full_path.startswith("ws/"):
-                return JSONResponse(status_code=404, content={"error": "Not found"})
-
-            # Root path
-            if not full_path or full_path == "":
-                return FileResponse(os.path.join(tui_dist, "index.html"))
-
-            # Check if it's a file that exists in the dist directory
-            file_path = os.path.join(tui_dist, full_path)
-            if os.path.isfile(file_path):
-                return FileResponse(file_path)
-
-            # Fallback to index.html for SPA (client-side routing)
-            return FileResponse(os.path.join(tui_dist, "index.html"))
-    else:
-        print("Warning: TUI dist directory not found. Serving API only.")
-
-    # Ensure database is initialized
-    print(f"Initializing database at {DB_PATH}")
-    Database(DB_PATH)
-
     port = int(os.environ.get("PORT", 8000))
-    print(f"Starting Tube2Txt API at http://0.0.0.0:{port}")
-    print(f"Database: {DB_PATH}")
-    print(f"Projects: {PROJECTS_DIR}")
+    print(f"Starting Tube2Txt Hub at http://0.0.0.0:{port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+if __name__ == "__main__":
+    start_hub()
 
 
 if __name__ == "__main__":
