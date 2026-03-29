@@ -297,7 +297,10 @@ Source: <a href="{self.video_url}" target="_blank">{self.video_url}</a>
         for seg in self.segments:
             ts_filename = seg['start'].replace(':', '-').replace('.', '-')
             html_content += f"""<li>
-    <div class="grab"><img src="images/{ts_filename}.jpg" /></div>
+    <div class="grab">
+        <img src="images/{ts_filename}.jpg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        <div class="no-preview" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:#111; color:#444; font-size:10px; text-transform:uppercase; border:1px solid #222;">No Preview</div>
+    </div>
     <div class="subtitle">
         <span id="{seg['start']}">{seg['text']}</span>
         <a href="{self.video_url}&t={seg['seconds']}" target="_blank" class="videolink">#</a>

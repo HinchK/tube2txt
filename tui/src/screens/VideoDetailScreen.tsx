@@ -65,18 +65,38 @@ export function VideoDetailScreen({ slug, onBack }: Props) {
         {activeTab === 0
           ? (
             <div className="flex flex-col gap-4 max-w-4xl mx-auto">
-              {selectedVideo.segments.map((seg, i) => (
-                <div key={i} className="flex gap-6 group hover:bg-zinc-900/30 p-2 -m-2 rounded transition-colors">
-                  <a 
-                    href={`${selectedVideo.url}&t=${seg.seconds}`}
-                    target="_blank"
-                    className="text-cyan-600 font-bold shrink-0 tabular-nums hover:text-cyan-400 transition-colors"
-                  >
-                    [{seg.start_ts}]
-                  </a>
-                  <div className="text-zinc-400 group-hover:text-zinc-200">{seg.text}</div>
-                </div>
-              ))}
+              {selectedVideo.segments.map((seg, i) => {
+                const tsFilename = seg.start_ts.replace(/:/g, '-').replace(/\./g, '-');
+                const imgUrl = `http://localhost:8000/api/videos/${selectedVideo.slug}/images/${tsFilename}.jpg`;
+                return (
+                  <div key={i} className="flex gap-6 group hover:bg-zinc-900/30 p-2 -m-2 rounded transition-colors">
+                    <div className="w-32 h-20 bg-zinc-900 flex-shrink-0 border border-zinc-800 flex items-center justify-center overflow-hidden relative rounded-sm">
+                      <img 
+                        src={imgUrl} 
+                        className="w-full h-full object-cover" 
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          (e.target as HTMLImageElement).nextElementSibling?.classList.add('flex');
+                        }}
+                      />
+                      <div className="hidden items-center justify-center w-full h-full text-[8px] text-zinc-700 font-black uppercase tracking-widest text-center px-2 bg-zinc-900/50">
+                        No Preview
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <a 
+                        href={`${selectedVideo.url}&t=${seg.seconds}`}
+                        target="_blank"
+                        className="text-cyan-600 font-bold shrink-0 tabular-nums hover:text-cyan-400 transition-colors"
+                      >
+                        [{seg.start_ts}]
+                      </a>
+                      <div className="text-zinc-400 group-hover:text-zinc-200">{seg.text}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )
           : (
