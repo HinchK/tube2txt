@@ -1,3 +1,10 @@
+# Build & Distribution
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.spec
+
 # OS Specific
 .DS_Store
 Thumbs.db
