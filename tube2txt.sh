@@ -22,13 +22,13 @@ fi
 # Cookie detection for yt-dlp
 COOKIES_ARG=""
 if [[ -n "${YT_DLP_COOKIES:-}" && -f "$YT_DLP_COOKIES" ]]; then
-    COOKIES_ARG="--cookies $YT_DLP_COOKIES"
+    COOKIES_ARG="--verbose --cookies $YT_DLP_COOKIES"
 elif [[ -f "$SCRIPT_DIR/cookies.txt" ]]; then
-    COOKIES_ARG="--cookies $SCRIPT_DIR/cookies.txt"
+    COOKIES_ARG="--verbose --cookies $SCRIPT_DIR/cookies.txt"
 elif [[ -f "$PROJECTS_DIR/cookies.txt" ]]; then
-    COOKIES_ARG="--cookies $PROJECTS_DIR/cookies.txt"
+    COOKIES_ARG="--verbose --cookies $PROJECTS_DIR/cookies.txt"
 elif [[ -f "$SCRIPT_DIR/src/cookies.txt" ]]; then
-    COOKIES_ARG="--cookies $SCRIPT_DIR/src/cookies.txt"
+    COOKIES_ARG="--verbose --cookies $SCRIPT_DIR/src/cookies.txt"
 fi
 
 # Verbose output helper
@@ -286,7 +286,7 @@ if [[ "$URL" == *"playlist?list="* ]] || [[ "$URL" == *"&list="* ]]; then
     pushd "$PROJECTS_DIR/$PLAYLIST_NAME" > /dev/null
     
     echo "Fetching video list..."
-    yt-dlp $COOKIES_ARG --quiet --flat-playlist --print "%(id)s" --print "%(title)s" "$URL" > playlist_data.txt
+    yt-dlp $COOKIES_ARG --verbose --flat-playlist --print "%(id)s" --print "%(title)s" "$URL" > playlist_data.txt
     
     while IFS= read -r ID && IFS= read -r TITLE; do
         CLEAN_TITLE=$(echo "$TITLE" | sed 's/[^a-zA-Z0-9]/_/g' | cut -c1-50)
