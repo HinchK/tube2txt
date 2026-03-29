@@ -171,30 +171,46 @@ async def ws_process(websocket: WebSocket):
             loop = asyncio.get_event_loop()
 
             try:
+                # Handle both 'command' string and structured fields
                 command = data.get("command")
-                if not command:
-                    raise ValueError("No command provided")
+                
+                url = data.get("url")
+                slug = data.get("slug", "default")
+                mode = data.get("mode", "outline")
+                ai_flag = data.get("ai", True)
+                parallel = data.get("parallel", 4)
+                db_path = DB_PATH # Use the default hub DB path
 
-                # Parse the command safely
-                parsed_args = shlex.split(command)
-                
-                # If they included "tube2txt" at the start, remove it
-                if parsed_args and parsed_args[0] == "tube2txt":
-                    parsed_args = parsed_args[1:]
-                
-                # Use the project's own parser
-                parser = get_parser()
-                args, unknown = parser.parse_known_args(parsed_args)
-                
-                # Resolve URL and slug exactly like main()
-                url = args.url
-                slug = args.slug_or_url
+                if not command and not url:
+                    raise ValueError("No command or URL provided")
+
+                if command:
+                    # Parse the command safely
+                    parsed_args = shlex.split(command)
+                    
+                    # If they included "tube2txt" at the start, remove it
+                    if parsed_args and parsed_args[0] == "tube2txt":
+                        parsed_args = parsed_args[1:]
+                    
+                    # Use the project's own parser
+                    parser = get_parser()
+                    args, unknown = parser.parse_known_args(parsed_args)
+                    
+                    # Resolve URL and slug exactly like main()
+                    url = args.url or url
+                    slug = args.slug_or_url or slug
+                    mode = getattr(args, "mode", mode)
+                    ai_flag = getattr(args, "ai", ai_flag)
+                    parallel = getattr(args, "parallel", parallel)
+                    db_path = getattr(args, "db", DB_PATH)
+
+                # Final URL/slug resolution logic matches CLI
                 if not url:
                     if slug and (slug.startswith("http") or len(slug) == 11):
                         url = slug
                         slug = "default"
                     else:
-                        raise ValueError("Missing URL in command")
+                        raise ValueError("Missing URL")
 
                 project_path = os.path.join(PROJECTS_DIR, slug)
 
@@ -209,11 +225,11 @@ async def ws_process(websocket: WebSocket):
                     lambda: process_video(
                         url=url,
                         slug=slug,
-                        mode=args.mode,
-                        ai_flag=args.ai,
-                        db_path=args.db,
+                        mode=mode,
+                        ai_flag=ai_flag,
+                        db_path=db_path,
                         project_path=project_path,
-                        parallel=args.parallel,
+                        parallel=parallel,
                         on_progress=on_progress,
                     ),
                 )

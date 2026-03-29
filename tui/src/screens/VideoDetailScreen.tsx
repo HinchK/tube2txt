@@ -81,7 +81,7 @@ export function VideoDetailScreen({ slug, onBack }: Props) {
                         }}
                       />
                       <div className="hidden items-center justify-center w-full h-full text-[8px] text-zinc-700 font-black uppercase tracking-widest text-center px-2 bg-zinc-900/50">
-                        No Preview
+                        No Image
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">

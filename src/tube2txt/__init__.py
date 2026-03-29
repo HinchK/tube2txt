@@ -26,14 +26,14 @@ def get_video_id(url):
     """Extract the 11-character video ID from various YouTube URL formats."""
     if len(url) == 11:
         return url
-    
+
     patterns = [
         r"(?:v=|\/)([0-9A-Za-z_-]{11}).*",
         r"youtu\.be\/([0-9A-Za-z_-]{11})",
         r"embed\/([0-9A-Za-z_-]{11})",
         r"shorts\/([0-9A-Za-z_-]{11})"
     ]
-    
+
     for pattern in patterns:
         match = re.search(pattern, url)
         if match:
@@ -299,7 +299,7 @@ Source: <a href="{self.video_url}" target="_blank">{self.video_url}</a>
             html_content += f"""<li>
     <div class="grab">
         <img src="images/{ts_filename}.jpg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-        <div class="no-preview" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:#111; color:#444; font-size:10px; text-transform:uppercase; border:1px solid #222;">No Preview</div>
+        <div class="no-preview" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:#111; color:#444; font-size:10px; text-transform:uppercase; border:1px solid #222;">No Image</div>
     </div>
     <div class="subtitle">
         <span id="{seg['start']}">{seg['text']}</span>
@@ -337,11 +337,9 @@ def download_video(url, output_dir, on_progress=None):
                 cookies_path = p
                 break
 
-    cmd.extend(["--cookies-from-browser chrome --cookies cookies.txt"])
-
-    # if cookies_path and os.path.exists(cookies_path):
-    #     _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
-    #     cmd.extend(["--cookies-from-browser chrome -cookies", cookies_path])
+    if cookies_path and os.path.exists(cookies_path):
+        _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
+        cmd.extend(["--cookies", cookies_path])
 
     cmd.append(url)
 
