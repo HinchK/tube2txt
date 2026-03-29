@@ -53,7 +53,7 @@ def load_cookies_to_session(session, cookies_path):
             print(f"Error loading cookies from {cookies_path}: {e}")
     return False
 
-def fetch_transcript_api(video_id, languages=['en', 'de']):
+def fetch_transcript_api(video_id, languages=['en', 'de'], on_progress=None):
     """Uses YouTubeTranscriptApi.fetch to fetch the transcript, with proxy and cookie support."""
     from youtube_transcript_api import (
         YouTubeTranscriptApi, 
@@ -82,7 +82,9 @@ def fetch_transcript_api(video_id, languages=['en', 'de']):
     
     if cookies_path:
         if load_cookies_to_session(session, cookies_path):
-            print(f"Transcript API: Loaded cookies from {cookies_path}")
+            _notify(on_progress, "status", "api", f"Transcript API: Loaded cookies from {cookies_path}")
+        else:
+            _notify(on_progress, "status", "api", f"Transcript API: Failed to load cookies from {cookies_path}")
 
     # Support proxies via environment variables
     proxy_config = None
@@ -94,7 +96,7 @@ def fetch_transcript_api(video_id, languages=['en', 'de']):
             http_url=http_proxy,
             https_url=https_proxy or http_proxy
         )
-        print(f"Transcript API: Using proxy configuration.")
+        _notify(on_progress, "status", "api", f"Transcript API: Using proxy configuration.")
 
     try:
         # Create an instance with our custom session and proxy config
@@ -102,16 +104,16 @@ def fetch_transcript_api(video_id, languages=['en', 'de']):
         transcript = ytt_api.fetch(video_id, languages=languages)
         return transcript.to_raw_data()
     except (IpBlocked, RequestBlocked):
-        print(f"Transcript API: IP is blocked or request rate-limited by YouTube.")
+        _notify(on_progress, "status", "api", f"Transcript API: IP is blocked or request rate-limited.")
         return None
     except TranscriptsDisabled:
-        print(f"Transcript API: Subtitles are disabled for video {video_id}.")
+        _notify(on_progress, "status", "api", f"Transcript API: Subtitles are disabled.")
         return None
     except NoTranscriptFound:
-        print(f"Transcript API: No transcript found in {languages} for {video_id}.")
+        _notify(on_progress, "status", "api", f"Transcript API: No transcript found in {languages}.")
         return None
     except Exception as e:
-        print(f"Error fetching transcript via API: {e}")
+        _notify(on_progress, "status", "api", f"Transcript API error: {e}")
         return None
 
 def format_vtt_timestamp(seconds):
@@ -490,7 +492,7 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
     segments = []
     if video_id:
         _notify(on_progress, "status", "api", f"Fetching transcript via API for {video_id}...")
-        api_data = fetch_transcript_api(video_id)
+        api_data = fetch_transcript_api(video_id, on_progress=on_progress)
         if api_data:
             # Parse it into segments (using format_vtt_timestamp for the start field)
             for item in api_data:
