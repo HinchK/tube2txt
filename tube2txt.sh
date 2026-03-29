@@ -20,16 +20,18 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
 fi
 
 # Cookie detection for yt-dlp
-COOKIES_ARG=""
-if [[ -n "${YT_DLP_COOKIES:-}" && -f "$YT_DLP_COOKIES" ]]; then
-    COOKIES_ARG="--verbose --cookies $YT_DLP_COOKIES"
-elif [[ -f "$SCRIPT_DIR/cookies.txt" ]]; then
-    COOKIES_ARG="--verbose --cookies $SCRIPT_DIR/cookies.txt"
-elif [[ -f "$PROJECTS_DIR/cookies.txt" ]]; then
-    COOKIES_ARG="--verbose --cookies $PROJECTS_DIR/cookies.txt"
-elif [[ -f "$SCRIPT_DIR/src/cookies.txt" ]]; then
-    COOKIES_ARG="--verbose --cookies $SCRIPT_DIR/src/cookies.txt"
-fi
+COOKIES_ARG="--verbose --cookies-from-browser"
+
+# testing browser import
+#if [[ -n "${YT_DLP_COOKIES:-}" && -f "$YT_DLP_COOKIES" ]]; then
+#    COOKIES_ARG="--verbose --cookies $YT_DLP_COOKIES"
+#elif [[ -f "$SCRIPT_DIR/cookies.txt" ]]; then
+#    COOKIES_ARG="--verbose --cookies $SCRIPT_DIR/cookies.txt"
+#elif [[ -f "$PROJECTS_DIR/cookies.txt" ]]; then
+#    COOKIES_ARG="--verbose --cookies $PROJECTS_DIR/cookies.txt"
+#elif [[ -f "$SCRIPT_DIR/src/cookies.txt" ]]; then
+#    COOKIES_ARG="--verbose --cookies $SCRIPT_DIR/src/cookies.txt"
+#fi
 
 # Verbose output helper
 v_echo() {
