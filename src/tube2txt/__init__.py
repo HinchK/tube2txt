@@ -283,9 +283,27 @@ def download_video(url, output_dir, on_progress=None):
     cmd = [
         "yt-dlp", "--no-warnings",
         "--write-auto-subs", "--write-subs",
-        "-o", os.path.join(output_dir, "video.%(ext)s"),
-        url
+        "-o", os.path.join(output_dir, "video.%(ext)s")
     ]
+    
+    # Add cookies if available
+    cookies_path = os.environ.get("YT_DLP_COOKIES")
+    if not cookies_path:
+        # Check standard locations
+        possible_paths = [
+            os.path.join(os.getcwd(), "cookies.txt"),
+            os.path.join(os.getcwd(), "projects", "cookies.txt")
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                cookies_path = p
+                break
+    
+    if cookies_path and os.path.exists(cookies_path):
+        _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
+        cmd.extend(["--cookies", cookies_path])
+    
+    cmd.append(url)
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         if result.stdout:
