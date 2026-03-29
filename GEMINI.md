@@ -45,29 +45,24 @@ This file serves as the system rules, context, and orientation guide for any AI 
 
 ## Strict Rules & Conventions
 
-1. **Output Directory:** All generated content goes to `projects/<slug>/`. The `.gitignore` ignores `projects/`.
-2. **Performance:** Image extraction uses parallel ffmpeg via `concurrent.futures.ThreadPoolExecutor`.
-3. **Progress Callback:** `process_video()` accepts `on_progress(type, step, message)`. When None, it prints (CLI mode). When provided, it streams to WebSocket.
-4. **Environment Variables:** `GEMINI_API_KEY` in `.env` (auto-loaded). `TUBE2TXT_DB` for custom DB path.
-5. **Error Handling:** Don't fail silently. Print clear errors and return None/False on failure.
-6. **Hub Restarts:** After making any changes to `src/tube2txt/hub.py` or the TUI, the `tube2txt-hub` process (hosting `0.0.0.0:8000`) MUST be killed and restarted to reflect changes.
-7. **Testing:** Always use `python -m pytest` to run tests to ensure the local module is in the path.
+1. **Output Directory:** All generated content goes to `projects/<slug>/`.
+2. **Hub Restarts:** After making any changes to `src/tube2txt/hub.py` or the TUI, the `tube2txt-hub` process MUST be killed and restarted to reflect changes.
+3. **Web TUI:** The TUI code (`tui/src/`) must use standard HTML tags (div, span, button) and Tailwind CSS for browser compatibility, even though it follows a terminal aesthetic.
+4. **Unified Input:** The "Command or URL" field in the Hub should be treated as a direct bridge to the CLI parameters.
+5. **Testing:** Always use `./scripts/test.sh` to ensure the correct Python environment.
 
 ## Common Commands
 
 ```bash
+# Full environment setup (Python + TUI)
+./scripts/setup.sh
+
+# Start the Intelligence Hub (Web Dashboard)
+uv run tube2txt-hub
+
 # Process a video via CLI
-tube2txt my-video "https://www.youtube.com/watch?v=VIDEO_ID" --ai --mode notes
-
-# Start the API server (serves TUI if built)
-tube2txt-hub
-
-# TUI development
-cd tui && bun install && bun run dev
-
-# Build TUI for production
-cd tui && bun run build-web
+uv run tube2txt "URL" --ai
 
 # Run tests
-python -m pytest tests/ -v
+./scripts/test.sh
 ```

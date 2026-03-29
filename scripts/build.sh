@@ -61,19 +61,14 @@ if $BUILD_PYTHON; then
 
   # Detect uv or fall back to pip
   if command -v uv &>/dev/null; then
-    # Activate venv if present
+    echo "Installing with uv..."
+    uv pip install -e ".[dev]"
+  else
     if [[ -f .venv/bin/activate ]]; then
       source .venv/bin/activate
     fi
-    echo "Installing with uv..."
-    uv pip install -e "."
-  elif [[ -f venv/bin/activate ]]; then
-    source venv/bin/activate
-    echo "Installing with pip (venv)..."
-    pip install -e "." --quiet
-  else
     echo "Installing with pip..."
-    pip install -e "." --quiet
+    pip install -e ".[dev]" --quiet
   fi
 
   echo "✓ Python package installed"
@@ -86,7 +81,10 @@ if $WATCH; then
   echo ""
   echo "Starting hub server..."
   cd "$ROOT"
-  [[ -f .venv/bin/activate ]] && source .venv/bin/activate
-  [[ -f venv/bin/activate ]] && source venv/bin/activate
-  tube2txt-hub
+  if command -v uv &>/dev/null; then
+    uv run tube2txt-hub
+  else
+    [[ -f .venv/bin/activate ]] && source .venv/bin/activate
+    tube2txt-hub
+  fi
 fi
