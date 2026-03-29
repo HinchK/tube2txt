@@ -22,261 +22,81 @@ Dynamic: license-file
 
 > **Inspiration:** This project is a modern rewrite of the original [Youtube2Webpage](https://github.com/obra/Youtube2Webpage) script.
 
-Tube2Txt converts YouTube videos into structured web pages with transcripts, screenshots, and AI-assisted analysis. It ships with a **Gridland TUI dashboard** and a headless **FastAPI + WebSocket API**.
+Tube2Txt converts YouTube videos into structured web pages with transcripts, screenshots, and AI-assisted analysis. It features a polished **Gridland TUI dashboard** accessible via any web browser.
 
 ## Features
 
-- **Gridland TUI**: Terminal dashboard built with Bun + OpenTUI + React — process videos, browse your library, and search transcripts, all from the terminal.
-- **WebSocket Processing**: Real-time progress streaming via `/ws/process` — the TUI connects here to show live logs.
-- **REST API**: Full JSON API for video listing, detail, image serving, and FTS5 search.
-- **AI Analysis**: Gemini-powered outlines, notes, recipes, technical summaries, and smart clip extraction.
-- **AI Voice by Strunk & White**: AI-generated content follows *The Elements of Style* (1918) for concise, active writing.
-- **FTS5 Global Search**: Search any word or phrase across all processed videos.
-- **Smart Clips**: Manual or AI-driven video segment extraction.
-- **Parallel Screenshot Extraction**: Up to 10x faster via `ThreadPoolExecutor` + ffmpeg.
-- **SQLite Database**: Centralized metadata and searchable transcript storage.
-- **Docker Support**: Multi-stage Dockerfile with Bun TUI build and Python runtime.
+- **Gridland Web Dashboard**: Polished terminal-aesthetic UI to process videos and browse your library.
+- **Unified Command Input**: Enter raw CLI parameters (e.g. `--ai --mode recipe`) directly into the web interface.
+- **WebSocket Processing**: Real-time progress streaming with structured logs.
+- **AI Analysis**: Gemini-powered summaries (outline, notes, recipe, technical, clips).
+- **FTS5 Global Search**: Instant full-text search across your entire video transcript library.
+- **Smart Clips**: AI-driven or manual extraction of highlights.
+- **High Performance**: Parallel ffmpeg extraction and SQLite/FTS5 indexing.
 
-## Architecture
+## Installation & Setup
 
-```
-src/tube2txt/
-  ├─ __init__.py        ← Core: Database, ClippingEngine, GeminiClient,
-  │                       VTTParser, HTMLGenerator; download_video(),
-  │                       extract_images(), process_video(), main() CLI
-  ├─ hub.py             ← FastAPI API: REST endpoints + WebSocket /ws/process
-  └─ index_existing.py  ← Migration script for legacy projects
+Tube2Txt requires **Python 3.9+**, **Bun**, and **ffmpeg**.
 
-tui/
-  ├─ src/index.tsx      ← App entry, screen router, navigation bar
-  ├─ src/hooks/         ← useWebSocket.ts, useVideos.ts, useSearch.ts
-  ├─ src/screens/       ← ProcessScreen, DashboardScreen, VideoDetailScreen, SearchScreen
-  └─ src/components/    ← TerminalLog, VideoCard, SearchResult
+1.  **Clone and Setup**:
+    ```bash
+    git clone https://github.com/youruser/tube2txt.git
+    cd tube2txt
+    ./scripts/setup.sh
+    ```
+    *This script creates a virtual environment, installs Python and TUI dependencies, and builds the production bundle.*
 
-pyproject.toml          ← Package config, entry points
-Dockerfile              ← Multi-stage: Bun (TUI) + Python (runtime)
-styles.css              ← CSS for generated HTML pages
-projects/               ← Output directory (gitignored)
-tube2txt.db             ← SQLite database (gitignored)
-```
-
-## Web Showcase (Gridland Aesthetic)
-
-We've included a standalone React component that provides a "Gridland" inspired terminal experience for showcasing `tube2txt` on the web.
-
-### Features
-
-- **CRT Effect**: Authentic scanlines, flicker, and glow.
-- **Simulated CLI**: Interactive typing demo showing the `--ai` pipeline.
-- **TUI Grid**: Terminal-style feature showcase using box-drawing aesthetics.
-
-Integration
-Copy `tui/src/components/Tube2TxtShowcase.tsx` into your React/Next.js project. It requires **Tailwind CSS**.
-
-```tsx
-import Tube2TxtShowcase from './components/Tube2TxtShowcase';
-```
-
-export default function Page() {
-  return <Tube2TxtShowcase />;
-}
-
-```
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/videos` | List all videos (ordered by date) |
-| `GET` | `/api/videos/{slug}` | Video detail with segments and AI files |
-| `GET` | `/api/videos/{slug}/images/{filename}` | Serve project images |
-| `GET` | `/api/search?q=` | FTS5 full-text search across all transcripts |
-| `WS` | `/ws/process` | Real-time video processing with progress events |
-
-### WebSocket Protocol (`/ws/process`)
-
-Send a JSON message to start processing:
-
-```json
-{
-  "action": "start",
-  "slug": "my-video",
-  "url": "https://youtube.com/watch?v=...",
-  "ai": true,
-  "mode": "outline"
-}
-```
-
-The server streams back `{"type": "...", "step": "...", "message": "..."}` events.
-
-## Installation & Deployment
-
-### Development Install (Local)
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/hinchk/tube2txt.git
-   cd tube2txt
-   ```
-
-2. **Build the TUI Dashboard (requires Bun):**
-
-   ```bash
-   cd tui
-   bun install
-   bun run build
-   cd ..
-   ```
-
-3. **Set up Python environment (using uv):**
-
-   ```bash
-   # Create and activate venv
-   uv venv
-   source .venv/bin/activate  # macOS/Linux
-   # .venv\Scripts\activate  # Windows
-
-   # Install in editable mode
-   uv pip install -e "."
-   ```
-
-4. **Launch the Hub:**
-
-   ```bash
-   tube2txt-hub
-   ```
-
-### Deployment to Railway
-
-Tube2Txt is ready for deployment on [Railway](https://railway.app).
-
-**Configuration:**
-
-- **Builder:** Dockerfile (auto-detected via `railway.json`).
-- **Env Vars:** Set `GEMINI_API_KEY` in the Railway dashboard.
-- **Port:** Uses the dynamic `PORT` assigned by Railway.
-
-**Persistent Storage:**
-Railway ephemeral disks are wiped on redeploy. For a production-like setup, mount a volume (e.g. `/app/projects`) to persist your library and the `tube2txt.db`.
-
-After installation, three commands are available:
-
-| Command | Description |
-|---|---|
-| `tube2txt` | Main Python worker (VTT parsing, AI generation, DB indexing) |
-| `tube2txt-hub` | Starts the API server + serves the TUI dashboard |
-| `tube2txt-index` | Migrates or re-indexes existing projects |
-
-### Method 3: Docker
-
-```bash
-docker compose up hub
-# In another terminal:
-docker compose run tube2txt tube2txt my-video "https://youtube.com/watch?v=..." --ai
-```
-
-## Troubleshooting
-
-### `sqlite3.OperationalError: unable to open database file`
-This often occurs if a directory named `tube2txt.db` exists in your project root. Ensure `tube2txt.db` is a file, or delete the empty directory if it was created by mistake:
-```bash
-rm -rf tube2txt.db
-```
-
-### `ffmpeg` Image Extraction Failures
-If you see errors like `Non full-range YUV is non-standard` or encoder failures during the "Extracting images" step, ensure your `ffmpeg` is up to date. Tube2Txt uses the `-strict -2` flag to improve compatibility with MJPEG encoders.
-
-### `NameError: name 'VTTParser' is not defined`
-If you encounter this after a recent update, your installed package might be out of sync. Reinstall the package from source:
-```bash
-pipx install . --force
-# Or if using uv:
-uv pip install -e "."
-```
+2.  **Environment**:
+    Create a `.env` file with your Google Gemini API key:
+    ```bash
+    GEMINI_API_KEY=your_key_here
+    ```
 
 ## Usage
 
-### Process a Video
+### 1. Launch the Hub (Web Dashboard)
 
 ```bash
-tube2txt my-video "https://www.youtube.com/watch?v=..." --ai --mode notes
+uv run tube2txt-hub
 ```
+*Access at http://0.0.0.0:8000. You must restart this process after modifying backend code.*
 
-Output goes to `projects/my-video/`:
-
-| File | Description |
-|---|---|
-| `index.html` | Transcript page with timestamped screenshots |
-| `images/` | Extracted video frames |
-| `TUBE2TXT-OUTLINE.md` | AI outline (when `--ai` is used) |
-| `TUBE2TXT-NOTES.md` | AI notes (when `--mode notes`) |
-
-### Launch the Hub + TUI
+### 2. CLI Processing
 
 ```bash
-tube2txt-hub
-```
-**Note:** You MUST restart the `tube2txt-hub` process after modifying the backend or building the TUI to see changes at `http://0.0.0.0:8000`.
+# Basic process
+uv run tube2txt "URL" --ai
 
-### TUI Development
+# Custom slug and mode
+uv run tube2txt my-recipe "URL" --ai --mode recipe
+```
+
+### 3. TUI Development
 
 ```bash
-cd tui && bun install && bun run dev
+cd tui && bun run dev
 ```
 
-### Build TUI for Production
+## Maintenance Scripts
+
+-   `./scripts/setup.sh`: Full environment initialization.
+-   `./scripts/build.sh`: Rebuild TUI and reinstall Python package.
+-   `./scripts/test.sh`: Run the full test suite.
+-   `./scripts/purge-projects.sh`: Clear all generated video data.
+-   `./scripts/backup.sh`: Create a timestamped backup of your database and projects.
+
+## Testing
 
 ```bash
-cd tui && bun run build-web
-# Output goes to tui/dist/, served at / by tube2txt-hub
+./scripts/test.sh
 ```
 
-### Smart Clips
+## Architecture
 
-```bash
-# AI picks the best moments
-tube2txt my-video "url" --ai --mode clips
-
-# Manual clip extraction
-tube2txt my-video "url" --clip 00:01:00-00:02:30
-```
-
-### Re-index Existing Projects
-
-```bash
-tube2txt-index
-# Or: python3 -m tube2txt.index_existing
-```
-
-## Options
-
-| Flag | Description |
-|---|---|
-| `--ai` | Generate AI content via Gemini |
-| `--mode <mode>` | AI mode: `outline` (default), `notes`, `recipe`, `technical`, `clips` |
-| `--parallel <N>` | Parallel ffmpeg processes for screenshot extraction (default: 4) |
-
-## Environment Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `GEMINI_API_KEY` | Google Gemini API key (required for `--ai`) | — |
-| `TUBE2TXT_DB` | Path to the SQLite database file | `tube2txt.db` in CWD |
-
-## Running Tests
-
-```bash
-python -m pytest tests/ -v
-```
-
-## Windows
-
-See [WINDOWS-INSTALL.md](WINDOWS-INSTALL.md).
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md).
+- **`src/tube2txt/`**: Python backend (FastAPI, yt-dlp, ffmpeg, Gemini).
+- **`tui/`**: React/TypeScript frontend built with OpenTUI and Tailwind.
+- **`projects/`**: Generated output (HTML, transcripts, images).
+- **`tube2txt.db`**: Central intelligence database.
 
 ## License
 
