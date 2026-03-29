@@ -33,7 +33,7 @@ class Database:
                 f"Cannot initialize database: '{self.db_path}' is a directory. "
                 "Please delete the directory or choose a different database path."
             )
-        
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -66,10 +66,10 @@ class Database:
             cursor.execute("INSERT OR REPLACE INTO videos (slug, url, title, processed_at) VALUES (?, ?, ?, ?)",
                          (slug, url, slug, datetime.now().isoformat()))
             video_id = cursor.lastrowid
-            
+
             # Clear old segments if any
             cursor.execute("DELETE FROM segments WHERE video_id = ?", (video_id,))
-            
+
             for seg in segments:
                 ts_filename = seg['start'].replace(':', '-').replace('.', '-')
                 thumbnail_path = f"images/{ts_filename}.jpg"
@@ -103,7 +103,7 @@ class GeminiClient:
 
     def generate_content(self, segments, mode='outline'):
         full_transcript = "\n".join([f"[{s['start']}] {s['text']}" for s in segments])
-        
+
         prompts = {
             'outline': (
                 "Provide a clear, high-level markdown outline of the content. "
@@ -144,7 +144,7 @@ class GeminiClient:
                 "maintaining a concise, vigorous style."
             )
         }
-        
+
         system_prompt = prompts.get(mode, prompts['outline'])
         prompt = f"""
 I have a transcript of a YouTube video. {system_prompt}
@@ -285,7 +285,7 @@ def download_video(url, output_dir, on_progress=None):
         "--write-auto-subs", "--write-subs",
         "-o", os.path.join(output_dir, "video.%(ext)s")
     ]
-    
+
     # Add cookies if available
     cookies_path = os.environ.get("YT_DLP_COOKIES")
     if not cookies_path:
@@ -299,11 +299,11 @@ def download_video(url, output_dir, on_progress=None):
             if os.path.exists(p):
                 cookies_path = p
                 break
-    
+
     if cookies_path and os.path.exists(cookies_path):
         _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
-        cmd.extend(["--cookies", cookies_path])
-    
+        cmd.extend(["--cookies-from-browser chrome -cookies", cookies_path])
+
     cmd.append(url)
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)

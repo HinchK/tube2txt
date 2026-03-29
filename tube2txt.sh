@@ -20,7 +20,8 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
 fi
 
 # Cookie detection for yt-dlp
-COOKIES_ARG="--verbose --cookies-from-browser"
+COOKIES_ARG="--verbose --cookies-from-browser chrome"
+
 
 # testing browser import
 #if [[ -n "${YT_DLP_COOKIES:-}" && -f "$YT_DLP_COOKIES" ]]; then
@@ -102,10 +103,10 @@ if [[ "$#" -eq 0 ]]; then
     echo "--- Tube2Txt Interactive Setup ---"
     read -p "Enter YouTube URL: " URL
     if [[ -z "$URL" ]]; then echo "URL is required."; exit 1; fi
-    
+
     read -p "Enter project title (default: default): " SLUG
     SLUG=${SLUG:-default}
-    
+
     if [[ -n "${GEMINI_API_KEY:-}" ]]; then
         read -p "Perform AI outline creation? (Y/n): " AI_CHOICE
         if [[ "$AI_CHOICE" != "n" ]]; then AI_FLAG="--ai"; fi
@@ -161,14 +162,14 @@ mkdir -p "$PROJECTS_DIR"
 process_video() {
     local VIDEO_URL=$1
     local VIDEO_SLUG=$2
-    
+
     echo "----------------------------------------------------"
     echo "Processing video: $VIDEO_SLUG ($VIDEO_URL)"
     echo "----------------------------------------------------"
-    
+
     v_echo "Creating directory: $PROJECTS_DIR/$VIDEO_SLUG/images"
     mkdir -p "$PROJECTS_DIR/$VIDEO_SLUG/images"
-    
+
     local ABS_STYLES_CSS=$(realpath "$STYLES_CSS")
 
     pushd "$PROJECTS_DIR/$VIDEO_SLUG" > /dev/null
@@ -206,7 +207,7 @@ process_video() {
     echo "Generating HTML and processing transcript..."
     local MODE_UPPER=$(echo "$MODE" | tr '[:lower:]' '[:upper:]')
     local OUTLINE_FILE="TUBE2TXT-${MODE_UPPER}.md"
-    
+
     v_echo "Running Python worker: $PYTHON_SCRIPT"
     # Run Python logic and capture output
     local PY_OUTPUT=$($PYTHON_SCRIPT \
@@ -226,7 +227,7 @@ process_video() {
     echo "Extracting images in parallel ($PARALLEL processes)..."
     local TS_FILE=$(mktemp)
     echo "$PY_OUTPUT" | grep "^TIMESTAMP:" | sed 's/TIMESTAMP://' > "$TS_FILE"
-    
+
     export VIDEO_FILE
     cat "$TS_FILE" | xargs -I {} -P "$PARALLEL" bash -c '
         TS="$1"
@@ -286,15 +287,15 @@ if [[ "$URL" == *"playlist?list="* ]] || [[ "$URL" == *"&list="* ]]; then
     PLAYLIST_NAME="$SLUG"
     mkdir -p "$PROJECTS_DIR/$PLAYLIST_NAME"
     pushd "$PROJECTS_DIR/$PLAYLIST_NAME" > /dev/null
-    
+
     echo "Fetching video list..."
     yt-dlp $COOKIES_ARG --verbose --flat-playlist --print "%(id)s" --print "%(title)s" "$URL" > playlist_data.txt
-    
+
     while IFS= read -r ID && IFS= read -r TITLE; do
         CLEAN_TITLE=$(echo "$TITLE" | sed 's/[^a-zA-Z0-9]/_/g' | cut -c1-50)
         process_video "https://www.youtube.com/watch?v=$ID" "$CLEAN_TITLE"
     done < playlist_data.txt
-    
+
     rm playlist_data.txt
     echo "Playlist processing complete!"
     popd > /dev/null
