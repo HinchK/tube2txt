@@ -37,7 +37,7 @@ COPY --from=tui-builder /tui/dist ./static/
 
 # Create projects directory
 RUN mkdir -p /app/projects
-COPY projects/cookies.txt /app/projects/cookies.txt
+COPY  .cookies.txt /app/projects/cookies.txt
 
 EXPOSE 8000
 
