@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { TerminalLog } from "../components/TerminalLog";
 
-const WS_URL = `ws://${window.location.hostname}:8000/ws/process`;
+// old method, works locally
+// const WS_URL = `ws://${window.location.hostname}:8000/ws/process`;
+const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/process`;
 
 interface Props {
   onWsStatusChange: (status: string) => void;
