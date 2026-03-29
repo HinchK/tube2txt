@@ -41,9 +41,27 @@ def get_video_id(url):
     return None
 
 def fetch_transcript_api(video_id, languages=['en', 'de']):
-    """Uses YouTubeTranscriptApi.get_transcript to fetch the transcript."""
+    """Uses YouTubeTranscriptApi.fetch to fetch the transcript."""
+    from youtube_transcript_api import (
+        YouTubeTranscriptApi, 
+        IpBlocked, 
+        RequestBlocked, 
+        TranscriptsDisabled,
+        NoTranscriptFound
+    )
     try:
-        return YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+        # Create an instance and call fetch
+        transcript = YouTubeTranscriptApi().fetch(video_id, languages=languages)
+        return transcript.to_raw_data()
+    except (IpBlocked, RequestBlocked):
+        print(f"Transcript API: IP is blocked or request rate-limited by YouTube.")
+        return None
+    except TranscriptsDisabled:
+        print(f"Transcript API: Subtitles are disabled for video {video_id}.")
+        return None
+    except NoTranscriptFound:
+        print(f"Transcript API: No transcript found in {languages} for {video_id}.")
+        return None
     except Exception as e:
         print(f"Error fetching transcript via API: {e}")
         return None

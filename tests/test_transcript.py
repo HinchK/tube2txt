@@ -1,5 +1,5 @@
 import pytest
-from tube2txt import get_video_id, format_vtt_timestamp
+from tube2txt import get_video_id, format_vtt_timestamp, fetch_transcript_api
 
 def test_get_video_id():
     # Standard watch URL
@@ -31,3 +31,12 @@ def test_format_vtt_timestamp():
     assert format_vtt_timestamp(36000.999) == "10:00:00.999"
     # Rounding/Formatting check
     assert format_vtt_timestamp(1.1234) == "00:00:01.123"
+
+def test_fetch_transcript_api_real():
+    """Integration test for the real YouTube Transcript API."""
+    video_id = "v26QZtUONDI"
+    segments = fetch_transcript_api(video_id)
+    assert segments is not None
+    assert len(segments) > 0
+    assert "text" in segments[0]
+    assert "start" in segments[0]
