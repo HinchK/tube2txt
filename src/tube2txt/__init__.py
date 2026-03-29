@@ -300,9 +300,11 @@ def download_video(url, output_dir, on_progress=None):
                 cookies_path = p
                 break
 
-    if cookies_path and os.path.exists(cookies_path):
-        _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
-        cmd.extend(["--cookies-from-browser chrome -cookies", cookies_path])
+cmd.extend(["--cookies-from-browser chrome -cookies cookies.txt"])
+
+    # if cookies_path and os.path.exists(cookies_path):
+    #     _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
+    #     cmd.extend(["--cookies-from-browser chrome -cookies", cookies_path])
 
     cmd.append(url)
     try:

@@ -20,7 +20,7 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
 fi
 
 # Cookie detection for yt-dlp
-COOKIES_ARG="--verbose --cookies-from-browser chrome"
+COOKIES_ARG="--verbose --cookies-from-browser chrome --cookies cookies.txt"
 
 
 # testing browser import
