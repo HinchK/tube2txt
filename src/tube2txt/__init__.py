@@ -418,18 +418,36 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
         project_path = os.path.join("projects", slug)
     os.makedirs(os.path.join(project_path, "images"), exist_ok=True)
 
-    # 1. Download
+    # 1. Transcript-First: Call get_video_id(url) and then fetch_transcript_api(video_id)
+    video_id = get_video_id(url)
+    segments = []
+    if video_id:
+        _notify(on_progress, "status", "api", f"Fetching transcript via API for {video_id}...")
+        api_data = fetch_transcript_api(video_id)
+        if api_data:
+            # Parse it into segments (using format_vtt_timestamp for the start field)
+            for item in api_data:
+                segments.append({
+                    'start': format_vtt_timestamp(item['start']),
+                    'text': item['text'],
+                    'seconds': int(item['start'])
+                })
+
+    # 2. Download (Video + VTT)
     _notify(on_progress, "status", "download", "Downloading video and subtitles...")
     video_file, vtt_file = download_video(url, project_path, on_progress=on_progress)
-    if not video_file or not vtt_file:
+
+    # 3. Fallback: If segments is empty but vtt_file exists, use VTTParser
+    if not segments and vtt_file:
+        _notify(on_progress, "status", "parse", "Parsing VTT fallback...")
+        parser = VTTParser(vtt_file)
+        segments = parser.parse()
+
+    if not segments:
+        _notify(on_progress, "error", "transcript", "No transcript found (API or VTT).")
         return None
 
-    # 2. Parse VTT
-    _notify(on_progress, "status", "parse", "Parsing subtitles...")
-    parser = VTTParser(vtt_file)
-    segments = parser.parse()
-
-    # 3. Generate HTML
+    # 4. Generate HTML (Proceed even if video_file is missing)
     _notify(on_progress, "status", "html", "Generating HTML...")
     html_gen = HTMLGenerator(segments, url, slug)
     html_gen.generate(os.path.join(project_path, "index.html"))
@@ -442,12 +460,12 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
     if os.path.exists(styles_src):
         shutil.copy(styles_src, os.path.join(project_path, "styles.css"))
 
-    # 4. DB indexing
+    # 5. DB indexing (Proceed even if video_file is missing)
     _notify(on_progress, "status", "index", f"Indexing video in database...")
     db = Database(db_path)
     db.index_video(slug, url, segments)
 
-    # 5. AI content
+    # 6. AI content (Proceed even if video_file is missing)
     api_key = os.environ.get("GEMINI_API_KEY")
     if ai_flag and not api_key:
         _notify(on_progress, "status", "ai", "Skipping AI -- GEMINI_API_KEY not set")
@@ -477,9 +495,12 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
                 f.write(clips)
             _notify(on_progress, "ai_output", "ai", clips)
 
-    # 6. Extract images
-    _notify(on_progress, "status", "images", "Extracting images...")
-    extract_images(video_file, segments, os.path.join(project_path, "images"), parallel=parallel)
+    # 7. Extract images: Call extract_images ONLY if video_file exists and is a valid file.
+    if video_file and os.path.exists(video_file):
+        _notify(on_progress, "status", "images", "Extracting images...")
+        extract_images(video_file, segments, os.path.join(project_path, "images"), parallel=parallel)
+    else:
+        _notify(on_progress, "status", "images", "Skipping image extraction (no video file).")
 
     _notify(on_progress, "complete", "done", f"Finished processing {slug}")
     return project_path
