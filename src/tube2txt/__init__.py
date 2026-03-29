@@ -385,20 +385,17 @@ Source: <a href="{self.video_url}" target="_blank">{self.video_url}</a>
 def download_video(url, output_dir, on_progress=None):
     """Download video and subtitles using yt-dlp. Returns (video_file, vtt_file) or (None, None)."""
     os.makedirs(output_dir, exist_ok=True)
-    cmd = [
-        "yt-dlp", "--no-warnings",
-        "--write-auto-subs", "--write-subs",
-        "-o", os.path.join(output_dir, "video.%(ext)s")
-    ]
-
+    
+    # 1. Prepare base command
+    base_cmd = ["yt-dlp", "--no-warnings"]
+    
     # Add cookies if available
     cookies_path = os.environ.get("YT_DLP_COOKIES")
     if not cookies_path:
-        # Check standard locations
         possible_paths = [
             os.path.join(os.getcwd(), "cookies.txt"),
-            os.path.join(os.getcwd(), "projects", "cookies.txt"),
-            os.path.join(os.getcwd(), "src", "cookies.txt")
+            os.path.join(os.getcwd(), "src", "cookies.txt"),
+            os.path.join(os.getcwd(), "projects", "cookies.txt")
         ]
         for p in possible_paths:
             if os.path.exists(p):
@@ -407,27 +404,44 @@ def download_video(url, output_dir, on_progress=None):
 
     if cookies_path and os.path.exists(cookies_path):
         _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
-        cmd.extend(["--cookies", cookies_path])
+        base_cmd.extend(["--cookies", cookies_path])
 
-    cmd.append(url)
+    # 2. First Pass: Attempt full download (Video + Subtitles)
+    full_cmd = base_cmd + [
+        "--write-auto-subs", "--write-subs",
+        "-o", os.path.join(output_dir, "video.%(ext)s"),
+        url
+    ]
 
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(full_cmd, check=True, capture_output=True, text=True)
         if result.stdout:
             for line in result.stdout.splitlines():
                 if line.strip():
                     _notify(on_progress, "status", "download", f"yt-dlp: {line}")
     except subprocess.CalledProcessError as e:
-        error_msg = f"yt-dlp failed (code {e.returncode})"
-        if e.stderr:
-            error_msg += f": {e.stderr.strip()}"
-        elif e.stdout:
-            error_msg += f": {e.stdout.strip()}"
-        _notify(on_progress, "error", "download", f"Error downloading: {error_msg}")
-        return None, None
-    except Exception as e:
-        _notify(on_progress, "error", "download", f"Unexpected error during download: {e}")
-        return None, None
+        _notify(on_progress, "status", "download", f"Full download failed, attempting subtitle-only fallback...")
+        
+        # 3. Second Pass: Subtitle-only fallback
+        # -f "ba/b" ensures it finds a minimal format to satisfy the requirement
+        sub_only_cmd = base_cmd + [
+            "--skip-download",
+            "--write-auto-subs", "--write-subs",
+            "-f", "ba/b",
+            "-o", os.path.join(output_dir, "video.%(ext)s"),
+            url
+        ]
+        try:
+            result = subprocess.run(sub_only_cmd, check=True, capture_output=True, text=True)
+            if result.stdout:
+                for line in result.stdout.splitlines():
+                    if line.strip():
+                        _notify(on_progress, "status", "download", f"yt-dlp (subs): {line}")
+        except subprocess.CalledProcessError as sub_e:
+            error_msg = f"yt-dlp failed (code {sub_e.returncode})"
+            if sub_e.stderr: error_msg += f": {sub_e.stderr.strip()}"
+            _notify(on_progress, "error", "download", f"Error downloading subs: {error_msg}")
+            return None, None
 
     # Find downloaded files
     video_files = glob_module.glob(os.path.join(output_dir, "video.*"))
