@@ -292,7 +292,8 @@ def download_video(url, output_dir, on_progress=None):
         # Check standard locations
         possible_paths = [
             os.path.join(os.getcwd(), "cookies.txt"),
-            os.path.join(os.getcwd(), "projects", "cookies.txt")
+            os.path.join(os.getcwd(), "projects", "cookies.txt"),
+            os.path.join(os.getcwd(), "src", "cookies.txt")
         ]
         for p in possible_paths:
             if os.path.exists(p):

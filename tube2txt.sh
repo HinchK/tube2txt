@@ -19,6 +19,18 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
     export $(grep -v '^#' "$SCRIPT_DIR/.env" | grep -v '^\s*$' | xargs)
 fi
 
+# Cookie detection for yt-dlp
+COOKIES_ARG=""
+if [[ -n "${YT_DLP_COOKIES:-}" && -f "$YT_DLP_COOKIES" ]]; then
+    COOKIES_ARG="--cookies $YT_DLP_COOKIES"
+elif [[ -f "$SCRIPT_DIR/cookies.txt" ]]; then
+    COOKIES_ARG="--cookies $SCRIPT_DIR/cookies.txt"
+elif [[ -f "$PROJECTS_DIR/cookies.txt" ]]; then
+    COOKIES_ARG="--cookies $PROJECTS_DIR/cookies.txt"
+elif [[ -f "$SCRIPT_DIR/src/cookies.txt" ]]; then
+    COOKIES_ARG="--cookies $SCRIPT_DIR/src/cookies.txt"
+fi
+
 # Verbose output helper
 v_echo() {
     if [[ "$VERBOSE" -eq 1 ]]; then
@@ -161,7 +173,7 @@ process_video() {
 
     echo "Downloading video and subtitles..."
     v_echo "Running yt-dlp..."
-    local VIDEO_FILE=$(yt-dlp --no-warnings --write-auto-subs --write-subs --no-simulate --print filename -o "video.%(ext)s" "$VIDEO_URL" | head -n 1)
+    local VIDEO_FILE=$(yt-dlp $COOKIES_ARG --no-warnings --write-auto-subs --write-subs --no-simulate --print filename -o "video.%(ext)s" "$VIDEO_URL" | head -n 1)
 
     if [[ ! -f "$VIDEO_FILE" ]]; then
         VIDEO_FILE=$(ls video.* | head -n 1 2>/dev/null) || true
@@ -274,7 +286,7 @@ if [[ "$URL" == *"playlist?list="* ]] || [[ "$URL" == *"&list="* ]]; then
     pushd "$PROJECTS_DIR/$PLAYLIST_NAME" > /dev/null
     
     echo "Fetching video list..."
-    yt-dlp --quiet --flat-playlist --print "%(id)s" --print "%(title)s" "$URL" > playlist_data.txt
+    yt-dlp $COOKIES_ARG --quiet --flat-playlist --print "%(id)s" --print "%(title)s" "$URL" > playlist_data.txt
     
     while IFS= read -r ID && IFS= read -r TITLE; do
         CLEAN_TITLE=$(echo "$TITLE" | sed 's/[^a-zA-Z0-9]/_/g' | cut -c1-50)

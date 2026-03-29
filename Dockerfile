@@ -34,8 +34,6 @@ RUN pip install --no-cache-dir .
 
 # Copy built TUI assets
 COPY --from=tui-builder /tui/dist ./static/
-COPY src/cookies.txt ./app/projects/cookies.txt
-
 # Create projects directory
 RUN mkdir -p /app/projects
 
