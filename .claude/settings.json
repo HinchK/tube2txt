@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import sys,json,os; d=json.load(sys.stdin); f=d.get('tool_input',{}).get('file_path',''); sys.exit(2 if os.path.basename(f)=='.env' else 0)\"",
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import sys,json; d=json.load(sys.stdin); f=d.get('tool_input',{}).get('file_path',''); sys.exit(0 if 'src/tube2txt' in f and f.endswith('.py') else 1)\" 2>/dev/null && .venv/bin/pytest tests/ -x -q 2>&1 | tail -20 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

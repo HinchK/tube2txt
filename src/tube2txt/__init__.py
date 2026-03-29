@@ -423,11 +423,13 @@ def download_video(url, output_dir, on_progress=None):
         _notify(on_progress, "status", "download", f"Full download failed, attempting subtitle-only fallback...")
         
         # 3. Second Pass: Subtitle-only fallback
-        # -f "ba/b" ensures it finds a minimal format to satisfy the requirement
+        # -f "ba/b/best" and --allow-unplayable-formats maximize chances of getting metadata/subs
         sub_only_cmd = base_cmd + [
             "--skip-download",
             "--write-auto-subs", "--write-subs",
-            "-f", "ba/b",
+            "--allow-unplayable-formats",
+            "--no-cache-dir",
+            "-f", "ba/b/best",
             "-o", os.path.join(output_dir, "video.%(ext)s"),
             url
         ]
@@ -438,10 +440,21 @@ def download_video(url, output_dir, on_progress=None):
                     if line.strip():
                         _notify(on_progress, "status", "download", f"yt-dlp (subs): {line}")
         except subprocess.CalledProcessError as sub_e:
-            error_msg = f"yt-dlp failed (code {sub_e.returncode})"
-            if sub_e.stderr: error_msg += f": {sub_e.stderr.strip()}"
-            _notify(on_progress, "error", "download", f"Error downloading subs: {error_msg}")
-            return None, None
+            _notify(on_progress, "status", "download", "Subtitle-only fallback failed, trying absolute minimal pass...")
+            
+            # 4. Third Pass: Absolute minimal (ignore everything, just try to write subs)
+            minimal_cmd = base_cmd + [
+                "--skip-download",
+                "--write-auto-subs", "--write-subs",
+                "--ignore-errors",
+                "--no-cache-dir",
+                "-o", os.path.join(output_dir, "video.%(ext)s"),
+                url
+            ]
+            try:
+                subprocess.run(minimal_cmd, check=False, capture_output=True, text=True)
+            except Exception:
+                pass # We'll check for files below anyway
 
     # Find downloaded files
     video_files = glob_module.glob(os.path.join(output_dir, "video.*"))
