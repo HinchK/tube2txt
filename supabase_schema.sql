@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.videos (
   date timestamp with time zone NOT NULL DEFAULT now(),
   slug text NOT NULL UNIQUE,
   title text,
+  url text,
   CONSTRAINT videos_pkey PRIMARY KEY (id)
 );
 
