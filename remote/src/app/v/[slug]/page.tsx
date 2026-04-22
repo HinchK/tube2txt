@@ -95,19 +95,28 @@ export default async function VideoDetail({ params }: { params: Promise<{ slug: 
         {/* Right Column: Intelligence & Data */}
         <div className="md:w-2/3 space-y-8">
           
-          {/* Intelligence Brief (Notes) - Promoted to Top */}
+          {/* 1. Technical Specifications (Promoted to Top) */}
+          {technical && (
+            <div className="glass-card p-8 border-white/5 group hover:border-white/10 transition-colors">
+              <h2 className="text-xl font-orbitron text-blue-400 mb-6 uppercase border-b border-white/10 pb-4">Technical Specifications</h2>
+              <div className="text-textMuted font-inter whitespace-pre-wrap leading-relaxed prose prose-invert max-w-none">
+                <IntelligenceBrief content={technical} />
+              </div>
+            </div>
+          )}
+
+          {/* 2. Data Stream (with persisted URL) */}
+          {segments.length > 0 && (
+            <DataStream videoId={videoId} segments={segments} baseUrl={video.url} />
+          )}
+
+          {/* 3. Intelligence Brief (Notes) */}
           {notes && (
             <IntelligenceBrief content={notes} />
           )}
 
-          {/* Data Stream - Now Collapsible */}
-          {segments.length > 0 && (
-            <DataStream videoId={videoId} segments={segments} />
-          )}
-
-          {/* Additional Content (Technical, etc) */}
+          {/* 4. Additional Content */}
           {[
-            { label: 'Technical Specifications', content: technical, color: 'text-blue-400' },
             { label: 'Operations Manual (Recipe)', content: recipe, color: 'text-orange-400' },
             { label: 'Key Extractions (Clips)', content: clips, color: 'text-purple-400' }
           ].map((section, i) => section.content && (

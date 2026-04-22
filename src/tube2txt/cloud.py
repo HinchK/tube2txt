@@ -162,6 +162,7 @@ def push(slug, db_path="tube2txt.db", projects_dir="projects"):
     video_payload = {
         "slug": slug,
         "title": title,
+        "url": video_url,
         "date": datetime.now().isoformat()
     }
     

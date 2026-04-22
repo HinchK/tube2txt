@@ -7,9 +7,10 @@ import { TimestampLink } from './TimestampLink';
 interface DataStreamProps {
   videoId: string;
   segments: any[];
+  baseUrl?: string;
 }
 
-export function DataStream({ videoId, segments }: DataStreamProps) {
+export function DataStream({ videoId, segments, baseUrl }: DataStreamProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // Listen for hash changes to auto-expand
@@ -64,7 +65,7 @@ export function DataStream({ videoId, segments }: DataStreamProps) {
                 id={`t-${seg.seconds}`}
                 className="flex gap-4 items-start p-2 rounded hover:bg-white/5 transition-colors scroll-mt-24"
               >
-                <TimestampLink videoId={videoId} seconds={seg.seconds} text={seg.text} />
+                <TimestampLink videoId={videoId} seconds={seg.seconds} text={seg.text} baseUrl={baseUrl} />
               </div>
             ))}
           </div>
