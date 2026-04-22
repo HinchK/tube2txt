@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #00FF41;
+  --color-secondary: #FF003C;
+  --color-accent: #00F0FF;
+  --color-background: #0D0E15;
+  --color-surface: rgba(20, 22, 35, 0.6);
+  --color-textPrimary: #E0E6ED;
+  --color-textMuted: #8A95A5;
+
+  --font-orbitron: var(--font-orbitron), sans-serif;
+  --font-inter: var(--font-inter), sans-serif;
+  --font-sharetech: var(--font-share-tech-mono), monospace;
+
+  --shadow-glow-primary: 0 0 10px rgba(0, 255, 65, 0.5), 0 0 20px rgba(0, 255, 65, 0.3);
+  --shadow-glow-accent: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
+}
+
+:root {
+  --background: #0D0E15;
+  --foreground: #E0E6ED;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter);
+}
+
+.glass-card {
+  background-color: var(--color-surface);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+  overflow: hidden;
+  transition: all 300ms ease;
+  position: relative;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 2px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.glass-card:hover::before {
+  opacity: 1;
+}
+
+.glass-card:hover {
+  box-shadow: var(--shadow-glow-accent);
+  border-color: rgba(0, 240, 255, 0.3);
+  transform: translateY(-4px);
+}
+
+/* Custom Animations for Tube2Txt */
+@keyframes highlightPulse {
+  0% { background-color: rgba(0, 255, 65, 0.2); box-shadow: 0 0 0px rgba(0, 255, 65, 0); }
+  50% { background-color: rgba(0, 255, 65, 0.4); box-shadow: 0 0 20px rgba(0, 255, 65, 0.5); }
+  100% { background-color: transparent; box-shadow: 0 0 0px rgba(0, 255, 65, 0); }
+}
+.highlight-pulse {
+  animation: highlightPulse 2s ease-out forwards;
+  border-radius: 4px;
+}
