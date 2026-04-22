@@ -52,8 +52,9 @@ def fetch_transcript_api(video_id, languages=['en', 'de'], on_progress=None):
     import requests
 
     try:
-        # Create an instance without custom session/cookies
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+        # Create an instance (required in 1.2.4+)
+        ytt_api = YouTubeTranscriptApi()
+        transcript = ytt_api.fetch(video_id, languages=languages).to_raw_data()
         return transcript
     except (IpBlocked, RequestBlocked):
         _notify(on_progress, "status", "api", f"Transcript API: IP is blocked or request rate-limited.")
@@ -360,55 +361,53 @@ def download_video(url, output_dir, on_progress=None):
     base_cmd = ["yt-dlp", "--no-warnings"]
 
 
-    # 2. First Pass: Attempt full download (Video + Subtitles)
-    full_cmd = base_cmd + [
-        "--write-auto-subs", "--write-subs",
-        "-o", os.path.join(output_dir, "video.%(ext)s"),
-        url
-    ]
-
     try:
-        result = subprocess.run(full_cmd, check=True, capture_output=True, text=True)
-        if result.stdout:
-            for line in result.stdout.splitlines():
-                if line.strip():
-                    _notify(on_progress, "status", "download", f"yt-dlp: {line}")
-    except subprocess.CalledProcessError as e:
-        _notify(on_progress, "status", "download", f"Full download failed, attempting subtitle-only fallback...")
-        
-        # 3. Second Pass: Subtitle-only fallback
-        # -f "ba/b/best" and --allow-unplayable-formats maximize chances of getting metadata/subs
-        sub_only_cmd = base_cmd + [
-            "--skip-download",
+        # 2. First Pass: Attempt full download (Video + Subtitles)
+        full_cmd = base_cmd + [
             "--write-auto-subs", "--write-subs",
-            "--allow-unplayable-formats",
-            "--no-cache-dir",
-            "-f", "ba/b/best",
             "-o", os.path.join(output_dir, "video.%(ext)s"),
             url
         ]
         try:
-            result = subprocess.run(sub_only_cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(full_cmd, check=True, capture_output=True, text=True)
             if result.stdout:
                 for line in result.stdout.splitlines():
                     if line.strip():
-                        _notify(on_progress, "status", "download", f"yt-dlp (subs): {line}")
-        except subprocess.CalledProcessError as sub_e:
-            _notify(on_progress, "status", "download", "Subtitle-only fallback failed, trying absolute minimal pass...")
+                        _notify(on_progress, "status", "download", f"yt-dlp: {line}")
+        except subprocess.CalledProcessError as e:
+            _notify(on_progress, "status", "download", f"Full download failed, attempting subtitle-only fallback...")
             
-            # 4. Third Pass: Absolute minimal (ignore everything, just try to write subs)
-            minimal_cmd = base_cmd + [
+            # 3. Second Pass: Subtitle-only fallback
+            sub_only_cmd = base_cmd + [
                 "--skip-download",
                 "--write-auto-subs", "--write-subs",
-                "--ignore-errors",
+                "--allow-unplayable-formats",
                 "--no-cache-dir",
+                "-f", "ba/b/best",
                 "-o", os.path.join(output_dir, "video.%(ext)s"),
                 url
             ]
             try:
-                subprocess.run(minimal_cmd, check=False, capture_output=True, text=True)
-            except Exception:
-                pass # We'll check for files below anyway
+                result = subprocess.run(sub_only_cmd, check=True, capture_output=True, text=True)
+                if result.stdout:
+                    for line in result.stdout.splitlines():
+                        if line.strip():
+                            _notify(on_progress, "status", "download", f"yt-dlp (subs): {line}")
+            except subprocess.CalledProcessError as sub_e:
+                _notify(on_progress, "status", "download", "Subtitle-only fallback failed, trying absolute minimal pass...")
+                
+                # 4. Third Pass: Absolute minimal
+                minimal_cmd = base_cmd + [
+                    "--skip-download", "--write-auto-subs", "--write-subs",
+                    "--allow-unplayable-formats", "--no-cache-dir",
+                    "-o", os.path.join(output_dir, "video.%(ext)s"),
+                    url
+                ]
+                subprocess.run(minimal_cmd, check=False, capture_output=True)
+
+    except Exception as e:
+        _notify(on_progress, "status", "download", f"yt-dlp download process failed: {e}")
+        return None, None
 
     # Find downloaded files
     video_files = glob_module.glob(os.path.join(output_dir, "video.*"))
@@ -573,6 +572,7 @@ def cmd_rm(args):
     """Remove a local project."""
     slug = args.slug
     if not slug:
+        print("Tip: You can remove directly using: tube2txt rm [slug]")
         slug = _select_project(args)
     if not slug:
         return
@@ -599,6 +599,7 @@ def cmd_archive(args):
     """Archive a project."""
     slug = args.slug
     if not slug:
+        print("Tip: You can archive directly using: tube2txt archive [slug]")
         slug = _select_project(args)
     if not slug:
         return
@@ -660,6 +661,7 @@ def cmd_push(args):
 def cmd_share(args):
     slug = args.slug
     if not slug:
+        print("Tip: You can share directly using: tube2txt share [slug]")
         slug = _select_project(args)
     if not slug:
         return
@@ -796,6 +798,15 @@ def cmd_interactive(args):
     interactive_args = DummyArgs(url, slug, ai_flag, args.db, args.projects_dir, "outline", 4)
     cmd_add(interactive_args)
 
+def normalize_command(command_name):
+    """Map aliases to canonical command names."""
+    if command_name in ["url", "process"]: return "add"
+    if command_name == "list": return "ls"
+    if command_name == "delete": return "rm"
+    if command_name == "sync": return "push"
+    if command_name == "setup": return "config"
+    return command_name
+
 def main():
     parser = get_parser()
     
@@ -813,21 +824,24 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command in ["add", "url", "process"]:
+    # Normalize aliases to canonical commands
+    command = normalize_command(args.command)
+
+    if command == "add":
         cmd_add(args)
-    elif args.command in ["ls", "list"]:
+    elif command == "ls":
         cmd_ls(args)
-    elif args.command in ["rm", "delete"]:
+    elif command == "rm":
         cmd_rm(args)
-    elif args.command == "archive":
+    elif command == "archive":
         cmd_archive(args)
-    elif args.command in ["config", "setup"]:
+    elif command == "config":
         cmd_config(args)
-    elif args.command == "remote":
+    elif command == "remote":
         cmd_remote(args)
-    elif args.command in ["push", "sync"]:
+    elif command == "push":
         cmd_push(args)
-    elif args.command == "share":
+    elif command == "share":
         cmd_share(args)
     else:
         parser.print_help()

@@ -26,6 +26,7 @@ def config():
     url = input("1. Supabase Project URL: ").strip()
     anon_key = input("2. Supabase Anon Key (for the web gallery): ").strip()
     service_key = input("3. Supabase Service Role Key (for the CLI to push data): ").strip()
+    gemini_key = input("4. Gemini API Key (for AI analysis): ").strip()
     
     if url and anon_key and service_key:
         os.makedirs("remote", exist_ok=True)
@@ -34,7 +35,13 @@ def config():
             f.write(f"NEXT_PUBLIC_SUPABASE_ANON_KEY={anon_key}\n")
             f.write(f"SUPABASE_SERVICE_ROLE_KEY={service_key}\n")
         
-        print(f"\n✅ Configuration saved to {env_path}")
+        # Save Gemini Key to root .env for CLI usage
+        if gemini_key:
+            with open(".env", "a") as f:
+                f.write(f"\nGEMINI_API_KEY={gemini_key}\n")
+            print(f"✅ Gemini Key saved to .env")
+        
+        print(f"\n✅ Remote configuration saved to {env_path}")
         print("\nNext steps:")
         print(f"1. Run the SQL schema in your Supabase Editor: {CLI_COLOR_CYAN}supabase_schema.sql{CLI_COLOR_RESET}")
         print("2. In Supabase > Authentication > Providers, you can disable 'Confirm Email' for quick local testing.")
