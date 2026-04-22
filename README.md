@@ -1,22 +1,21 @@
-# Tube2Txt v3.1
+# Tube2Txt Forge v3.2
 
 > **Inspiration:** This project is a modern rewrite of the original [Youtube2Webpage](https://github.com/obra/Youtube2Webpage) script.
 
-Tube2Txt converts YouTube videos into structured web pages with transcripts, screenshots, and AI-assisted analysis. It features a polished **Gridland TUI dashboard** accessible via any web browser.
+Tube2Txt is a "Local-First" video intelligence forge. It processes YouTube videos into structured Markdown archives locally on your machine and pushes them to your remote Supabase gallery.
 
 ## Features
 
-- **Gridland Web Dashboard**: Polished terminal-aesthetic UI to process videos and browse your library.
-- **Unified Command Input**: Enter raw CLI parameters (e.g. `--ai --mode recipe`) directly into the web interface.
-- **WebSocket Processing**: Real-time progress streaming with structured logs.
+- **Standardized CLI**: Git-style verbs (`add`, `ls`, `push`, `config`, `rm`, `share`) for an intuitive developer experience.
+- **Progressive Disclosure**: Interactive prompts guide you through missing arguments, including a full **Interactive Forge** mode.
+- **Gridland Web Hub**: Polished terminal-aesthetic UI to process videos and browse your library locally.
+- **Supabase Remote Gallery**: Sync your local forge to a hosted web gallery with authentication and shared browsing.
 - **AI Analysis**: Gemini-powered summaries (outline, notes, recipe, technical, clips).
-- **FTS5 Global Search**: Instant full-text search across your entire video transcript library.
 - **Smart Clips**: AI-driven or manual extraction of highlights.
-- **High Performance**: Parallel ffmpeg extraction and SQLite/FTS5 indexing.
 
 ## Installation & Setup
 
-Tube2Txt requires **Python 3.9+**, **Bun**, and **ffmpeg**.
+Tube2Txt requires **Python 3.9+**, **Node/Bun**, and **ffmpeg**.
 
 1.  **Clone and Setup**:
     ```bash
@@ -24,38 +23,47 @@ Tube2Txt requires **Python 3.9+**, **Bun**, and **ffmpeg**.
     cd tube2txt
     ./scripts/setup.sh
     ```
-    *This script creates a virtual environment, installs Python and TUI dependencies, and builds the production bundle.*
 
-2.  **Environment**:
-    Create a `.env` file with your Google Gemini API key:
+2.  **Configuration**:
+    Run the interactive setup to configure your Supabase remote and Gemini API key:
     ```bash
-    GEMINI_API_KEY=your_key_here
+    uv run tube2txt config
     ```
 
 ## Usage
 
-### 1. Launch the Hub (Web Dashboard)
+### 1. Process Video (`add`)
+Adds a YouTube video to your local forge.
+```bash
+# Basic process
+uv run tube2txt add "https://www.youtube.com/watch?v=..." --ai
 
+# Legacy shortcut still works
+uv run tube2txt "URL"
+```
+
+### 2. List Archives (`ls`)
+Lists all locally processed videos and their sync status.
+```bash
+uv run tube2txt ls
+```
+
+### 3. Push to Remote (`push`)
+Uploads local metadata and transcripts to your remote Supabase gallery.
+```bash
+uv run tube2txt push [SLUG]
+```
+
+### 4. Management (`rm`, `archive`, `share`)
+- `rm [SLUG]`: Permanently removes a local project.
+- `archive [SLUG]`: Marks a project as archived locally.
+- `share [SLUG]`: Displays the remote URL for a synced video.
+
+### 5. Launch the Hub (Local Web Dashboard)
 ```bash
 uv run tube2txt-hub
 ```
-*Access at http://0.0.0.0:8000. You must restart this process after modifying backend code.*
-
-### 2. CLI Processing
-
-```bash
-# Basic process
-uv run tube2txt "URL" --ai
-
-# Custom slug and mode
-uv run tube2txt my-recipe "URL" --ai --mode recipe
-```
-
-### 3. TUI Development
-
-```bash
-cd tui && bun run dev
-```
+*Access at http://0.0.0.0:8000.*
 
 ## Maintenance Scripts
 
@@ -63,20 +71,14 @@ cd tui && bun run dev
 -   `./scripts/build.sh`: Rebuild TUI and reinstall Python package.
 -   `./scripts/test.sh`: Run the full test suite.
 -   `./scripts/purge-projects.sh`: Clear all generated video data.
--   `./scripts/backup.sh`: Create a timestamped backup of your database and projects.
-
-## Testing
-
-```bash
-./scripts/test.sh
-```
 
 ## Architecture
 
-- **`src/tube2txt/`**: Python backend (FastAPI, yt-dlp, ffmpeg, Gemini).
-- **`tui/`**: React/TypeScript frontend built with OpenTUI and Tailwind.
-- **`projects/`**: Generated output (HTML, transcripts, images).
-- **`tube2txt.db`**: Central intelligence database.
+- **`src/tube2txt/`**: Python backend (FastAPI, yt-dlp, ffmpeg, Gemini, Supabase).
+- **`tui/`**: React/TypeScript local dashboard built with Tailwind.
+- **`remote/`**: Next.js/Supabase web gallery for cloud hosting.
+- **`projects/`**: Generated local output (HTML, transcripts, images).
+- **`tube2txt.db`**: Central SQLite intelligence database.
 
 ## License
 

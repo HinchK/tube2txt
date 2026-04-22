@@ -40,21 +40,8 @@ def get_video_id(url):
             return match.group(1)
     return None
 
-def load_cookies_to_session(session, cookies_path):
-    """Load Netscape-format cookies.txt into a requests.Session."""
-    import http.cookiejar
-    if cookies_path and os.path.exists(cookies_path):
-        try:
-            cj = http.cookiejar.MozillaCookieJar(cookies_path)
-            cj.load(ignore_discard=True, ignore_expires=True)
-            session.cookies.update(cj)
-            return True
-        except Exception as e:
-            print(f"Error loading cookies from {cookies_path}: {e}")
-    return False
-
 def fetch_transcript_api(video_id, languages=['en', 'de'], on_progress=None):
-    """Uses YouTubeTranscriptApi.fetch to fetch the transcript, with proxy and cookie support."""
+    """Uses YouTubeTranscriptApi.fetch to fetch the transcript."""
     from youtube_transcript_api import (
         YouTubeTranscriptApi, 
         IpBlocked, 
@@ -62,47 +49,13 @@ def fetch_transcript_api(video_id, languages=['en', 'de'], on_progress=None):
         TranscriptsDisabled,
         NoTranscriptFound
     )
-    from youtube_transcript_api.proxies import GenericProxyConfig
     import requests
 
-    session = requests.Session()
-    
-    # Try to load cookies from standard locations
-    cookies_path = os.environ.get("YT_DLP_COOKIES")
-    if not cookies_path:
-        possible_paths = [
-            os.path.join(os.getcwd(), "cookies.txt"),
-            os.path.join(os.getcwd(), "src", "cookies.txt"),
-            os.path.join(os.getcwd(), "projects", "cookies.txt")
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                cookies_path = p
-                break
-    
-    if cookies_path:
-        if load_cookies_to_session(session, cookies_path):
-            _notify(on_progress, "status", "api", f"Transcript API: Loaded cookies from {cookies_path}")
-        else:
-            _notify(on_progress, "status", "api", f"Transcript API: Failed to load cookies from {cookies_path}")
-
-    # Support proxies via environment variables
-    proxy_config = None
-    http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
-    https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
-    
-    if http_proxy or https_proxy:
-        proxy_config = GenericProxyConfig(
-            http_url=http_proxy,
-            https_url=https_proxy or http_proxy
-        )
-        _notify(on_progress, "status", "api", f"Transcript API: Using proxy configuration.")
-
     try:
-        # Create an instance with our custom session and proxy config
-        ytt_api = YouTubeTranscriptApi(http_client=session, proxy_config=proxy_config)
-        transcript = ytt_api.fetch(video_id, languages=languages)
-        return transcript.to_raw_data()
+        # Create an instance (required in 1.2.4+)
+        ytt_api = YouTubeTranscriptApi()
+        transcript = ytt_api.fetch(video_id, languages=languages).to_raw_data()
+        return transcript
     except (IpBlocked, RequestBlocked):
         _notify(on_progress, "status", "api", f"Transcript API: IP is blocked or request rate-limited.")
         return None
@@ -144,9 +97,27 @@ class Database:
                     slug TEXT UNIQUE,
                     url TEXT,
                     title TEXT,
-                    processed_at DATETIME
+                    processed_at DATETIME,
+                    remote_url TEXT,
+                    is_archived BOOLEAN DEFAULT 0,
+                    last_synced_at DATETIME
                 )
             """)
+            
+            # Handle migrations for existing DBs
+            try:
+                cursor.execute("ALTER TABLE videos ADD COLUMN remote_url TEXT")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                cursor.execute("ALTER TABLE videos ADD COLUMN is_archived BOOLEAN DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                cursor.execute("ALTER TABLE videos ADD COLUMN last_synced_at DATETIME")
+            except sqlite3.OperationalError:
+                pass
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS segments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -210,40 +181,37 @@ class GeminiClient:
             'outline': (
                 "Provide a clear, high-level markdown outline of the content. "
                 "Include timestamps in brackets [HH:MM:SS] for each section. "
-                "Adhere to 'The Elements of Style' (1918): omit needless words, "
-                "be specific, concrete, and definite."
+                "Format the entire output in Markdown."
             ),
             'notes': (
-                "Create detailed study notes from this transcript. "
-                "Adhere strictly to the principles of 'The Elements of Style' (1918): "
-                "Be clear, concise, and use the active voice. Omit needless words. "
-                "Include key takeaways, definitions of complex terms, and a summary for each major section. "
-                "Use timestamps in brackets [HH:MM:SS]."
+                "Create detailed Intelligence Brief (Notes) from this transcript. "
+                "Format the entire output in Markdown. "
+                "Start the notes with a very quippy, irreverently silly synopsis of the video content. "
+                "Write the entirety of the Intelligence Brief Notes in the voice and persona of Prot (played by Kevin Spacey) from the movie K-PAX. "
+                "You are delivering an earnest, slightly detached, yet fascinated debrief on an alien cultural phenomenon (humanity) based on the video you just observed. "
+                "Use timestamps in brackets [HH:MM:SS] to reference specific moments."
             ),
             'recipe': (
                 "Extract recipes, ingredients, and cooking steps from this transcript. "
-                "Follow 'The Elements of Style' (1918): use the active voice for instructions, "
-                "be specific and definite, and omit needless words. "
+                "Format the entire output in Markdown. "
                 "Format them clearly in markdown with timestamps [HH:MM:SS]."
             ),
             'technical': (
                 "Provide a technical deep-dive or documentation based on this transcript. "
-                "Adhere to 'The Elements of Style' (1918): use definite, specific, concrete language. "
-                "Omit needless words. Focus on implementation details, code concepts, and architectural points. "
+                "Format the entire output in Markdown. "
+                "Focus on implementation details, code concepts, and architectural points. "
                 "Use timestamps in brackets [HH:MM:SS]."
             ),
             'clips': (
                 "Identify the 3 most interesting, viral, or high-value 30-60 second segments from this video. "
-                "In your descriptions, follow 'The Elements of Style' (1918): "
-                "use active voice, be specific, and omit needless words. "
+                "Format the entire output in Markdown. "
                 "For each, provide:\n"
                 "1. A catchy title.\n"
                 "2. Start and End timestamps (format: HH:MM:SS-HH:MM:SS).\n"
                 "3. A brief reason why it's a great clip.\n"
                 "Return ONLY the data in this format:\n"
                 "CLIP:[Title]|[HH:MM:SS-HH:MM:SS]|[Reason]\n"
-                "After the CLIP: lines, you may provide a brief markdown summary of why these clips represent the essence of the video, "
-                "maintaining a concise, vigorous style."
+                "After the CLIP: lines, you may provide a brief markdown summary of why these clips represent the essence of the video."
             )
         }
 
@@ -388,73 +356,55 @@ def download_video(url, output_dir, on_progress=None):
     
     # 1. Prepare base command
     base_cmd = ["yt-dlp", "--no-warnings"]
-    
-    # Add cookies if available
-    cookies_path = os.environ.get("YT_DLP_COOKIES")
-    if not cookies_path:
-        possible_paths = [
-            os.path.join(os.getcwd(), "cookies.txt"),
-            os.path.join(os.getcwd(), "src", "cookies.txt"),
-            os.path.join(os.getcwd(), "projects", "cookies.txt")
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                cookies_path = p
-                break
 
-    if cookies_path and os.path.exists(cookies_path):
-        _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
-        base_cmd.extend(["--cookies", cookies_path])
-
-    # 2. First Pass: Attempt full download (Video + Subtitles)
-    full_cmd = base_cmd + [
-        "--write-auto-subs", "--write-subs",
-        "-o", os.path.join(output_dir, "video.%(ext)s"),
-        url
-    ]
 
     try:
-        result = subprocess.run(full_cmd, check=True, capture_output=True, text=True)
-        if result.stdout:
-            for line in result.stdout.splitlines():
-                if line.strip():
-                    _notify(on_progress, "status", "download", f"yt-dlp: {line}")
-    except subprocess.CalledProcessError as e:
-        _notify(on_progress, "status", "download", f"Full download failed, attempting subtitle-only fallback...")
-        
-        # 3. Second Pass: Subtitle-only fallback
-        # -f "ba/b/best" and --allow-unplayable-formats maximize chances of getting metadata/subs
-        sub_only_cmd = base_cmd + [
-            "--skip-download",
+        # 2. First Pass: Attempt full download (Video + Subtitles)
+        full_cmd = base_cmd + [
             "--write-auto-subs", "--write-subs",
-            "--allow-unplayable-formats",
-            "--no-cache-dir",
-            "-f", "ba/b/best",
             "-o", os.path.join(output_dir, "video.%(ext)s"),
             url
         ]
         try:
-            result = subprocess.run(sub_only_cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(full_cmd, check=True, capture_output=True, text=True)
             if result.stdout:
                 for line in result.stdout.splitlines():
                     if line.strip():
-                        _notify(on_progress, "status", "download", f"yt-dlp (subs): {line}")
-        except subprocess.CalledProcessError as sub_e:
-            _notify(on_progress, "status", "download", "Subtitle-only fallback failed, trying absolute minimal pass...")
+                        _notify(on_progress, "status", "download", f"yt-dlp: {line}")
+        except subprocess.CalledProcessError as e:
+            _notify(on_progress, "status", "download", f"Full download failed, attempting subtitle-only fallback...")
             
-            # 4. Third Pass: Absolute minimal (ignore everything, just try to write subs)
-            minimal_cmd = base_cmd + [
+            # 3. Second Pass: Subtitle-only fallback
+            sub_only_cmd = base_cmd + [
                 "--skip-download",
                 "--write-auto-subs", "--write-subs",
-                "--ignore-errors",
+                "--allow-unplayable-formats",
                 "--no-cache-dir",
+                "-f", "ba/b/best",
                 "-o", os.path.join(output_dir, "video.%(ext)s"),
                 url
             ]
             try:
-                subprocess.run(minimal_cmd, check=False, capture_output=True, text=True)
-            except Exception:
-                pass # We'll check for files below anyway
+                result = subprocess.run(sub_only_cmd, check=True, capture_output=True, text=True)
+                if result.stdout:
+                    for line in result.stdout.splitlines():
+                        if line.strip():
+                            _notify(on_progress, "status", "download", f"yt-dlp (subs): {line}")
+            except subprocess.CalledProcessError as sub_e:
+                _notify(on_progress, "status", "download", "Subtitle-only fallback failed, trying absolute minimal pass...")
+                
+                # 4. Third Pass: Absolute minimal
+                minimal_cmd = base_cmd + [
+                    "--skip-download", "--write-auto-subs", "--write-subs",
+                    "--allow-unplayable-formats", "--no-cache-dir",
+                    "-o", os.path.join(output_dir, "video.%(ext)s"),
+                    url
+                ]
+                subprocess.run(minimal_cmd, check=False, capture_output=True)
+
+    except Exception as e:
+        _notify(on_progress, "status", "download", f"yt-dlp download process failed: {e}")
+        return None, None
 
     # Find downloaded files
     video_files = glob_module.glob(os.path.join(output_dir, "video.*"))
@@ -602,25 +552,132 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
     return project_path
 
 
-def get_parser():
-    parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
-    parser.add_argument("slug_or_url", nargs="?", help="Project slug or YouTube URL")
-    parser.add_argument("url", nargs="?", help="YouTube video URL (if slug provided)")
-    parser.add_argument("--vtt", help="Path to existing VTT file (skips download)")
-    parser.add_argument("--ai", action="store_true", help="Run AI generation")
-    parser.add_argument("--mode", default="outline", help="Requested AI mode")
-    parser.add_argument("--parallel", type=int, default=4, help="Parallel image extraction")
-    parser.add_argument("--db", default="tube2txt.db", help="Path to SQLite DB")
-    parser.add_argument("--projects-dir", default="projects", help="Directory for output")
-    parser.add_argument("--clip", help="Manual clip: START-END")
-    parser.add_argument("--video-file", help="Video file for manual clipping")
-    return parser
+def cmd_ls(args):
+    """List local projects."""
+    db = Database(args.db)
+    with sqlite3.connect(db.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, slug, url, processed_at, remote_url, is_archived, last_synced_at FROM videos")
+        rows = cursor.fetchall()
+        print(f"{'ID':<5} | {'Slug':<20} | {'Processed At':<20} | {'Remote URL':<25} | {'Synced'}")
+        print("-" * 85)
+        for row in rows:
+            sync_status = row[6] if row[6] else 'Never'
+            print(f"{row[0]:<5} | {row[1]:<20} | {row[3]:<20} | {(row[4] or 'None'):<25} | {sync_status}")
 
+def cmd_rm(args):
+    """Remove a local project."""
+    slug = args.slug
+    if not slug:
+        print("Tip: You can remove directly using: tube2txt rm [slug]")
+        slug = _select_project(args)
+    if not slug:
+        return
 
-def main():
-    parser = get_parser()
-    args = parser.parse_args()
+    print(f"Removing project: {slug}")
+    db = Database(args.db)
+    with sqlite3.connect(db.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM videos WHERE slug = ?", (slug,))
+        row = cursor.fetchone()
+        if not row:
+            print(f"Slug {slug} not found in DB.")
+            return
+        video_id = row[0]
+        cursor.execute("DELETE FROM segments WHERE video_id = ?", (video_id,))
+        cursor.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+        conn.commit()
+    project_path = os.path.join(args.projects_dir, slug)
+    if os.path.exists(project_path):
+        shutil.rmtree(project_path)
+        print(f"Removed directory: {project_path}")
 
+def cmd_archive(args):
+    """Archive a project."""
+    slug = args.slug
+    if not slug:
+        print("Tip: You can archive directly using: tube2txt archive [slug]")
+        slug = _select_project(args)
+    if not slug:
+        return
+
+    print(f"Archiving project: {slug}")
+    db = Database(args.db)
+    with sqlite3.connect(db.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE videos SET is_archived = 1 WHERE slug = ?", (slug,))
+        conn.commit()
+
+from tube2txt.cloud import config, push, get_remote_url
+
+def _select_project(args, unsynced_only=False):
+    """Interactively select a project from a numbered list."""
+    db = Database(args.db)
+    query = "SELECT slug, title FROM videos"
+    if unsynced_only:
+        query += " WHERE last_synced_at IS NULL"
+    query += " ORDER BY processed_at DESC"
+    
+    with sqlite3.connect(db.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+    if not rows:
+        if unsynced_only:
+            # Fallback to show all if no unsynced ones found
+            return _select_project(args, unsynced_only=False)
+        print("No projects found.")
+        return None
+        
+    print("\nSelect a project:")
+    for i, row in enumerate(rows[:15]):
+        print(f"[{i+1}] {row[0]} - {row[1]}")
+    
+    choice = input("\nSelect a number (or Enter to cancel): ").strip()
+    if not choice or not choice.isdigit() or int(choice) > len(rows):
+        return None
+    return rows[int(choice)-1][0]
+
+def cmd_config(args):
+    config()
+
+def cmd_remote(args):
+    print("Checking remote deployment status...")
+    url = get_remote_url()
+    print(f"Live Gallery URL: {url}")
+
+def cmd_push(args):
+    slug = args.slug
+    if not slug:
+        print("Tip: You can push directly using: tube2txt push [slug]")
+        slug = _select_project(args, unsynced_only=True)
+    if slug:
+        push(slug, db_path=args.db, projects_dir=args.projects_dir)
+
+def cmd_share(args):
+    slug = args.slug
+    if not slug:
+        print("Tip: You can share directly using: tube2txt share [slug]")
+        slug = _select_project(args)
+    if not slug:
+        return
+
+    # Check if synced
+    db = Database(args.db)
+    with sqlite3.connect(db.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT last_synced_at FROM videos WHERE slug = ?", (slug,))
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            print(f"Error: Project '{slug}' has not been pushed to the grid yet.")
+            print(f"Run 'tube2txt push {slug}' first.")
+            return
+
+    url = get_remote_url(slug)
+    print(f"Share link for {slug}: {url}")
+
+def cmd_add(args):
     # Manual Clipping
     if args.clip and args.video_file:
         clip_match = re.match(r'^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)-(\d{2}:\d{2}:\d{2}(?:\.\d+)?)$', args.clip)
@@ -642,15 +699,18 @@ def main():
             url = slug
             slug = "default"
         else:
-            print("Error: Missing URL.")
-            sys.exit(1)
+            print("No URL provided. Entering interactive mode...")
+            cmd_interactive(args)
+            return
 
     project_path = os.path.join(args.projects_dir, slug)
+    # Auto-enable AI if GEMINI_API_KEY is set, even without --ai flag
+    ai_flag = args.ai or bool(os.environ.get("GEMINI_API_KEY"))
     result = process_video(
         url=url,
         slug=slug,
         mode=args.mode,
-        ai_flag=args.ai,
+        ai_flag=ai_flag,
         db_path=args.db,
         project_path=project_path,
         parallel=args.parallel,
@@ -658,6 +718,130 @@ def main():
 
     if result:
         print(f"\nProject: {os.path.abspath(result)}")
+
+def get_parser():
+    parser = argparse.ArgumentParser(description="Tube2Txt Python Logic")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Common args
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument("--db", default="tube2txt.db", help="Path to SQLite DB")
+    common_parser.add_argument("--projects-dir", default="projects", help="Directory for output")
+
+    # Command: add
+    parser_add = subparsers.add_parser("add", aliases=["url", "process"], parents=[common_parser], help="Process a YouTube URL")
+    parser_add.add_argument("url", nargs="?", help="YouTube URL or video ID")
+    parser_add.add_argument("slug_or_url", nargs="?", help="Project slug (optional)")
+    parser_add.add_argument("--ai", action="store_true", help="Enable AI processing")
+    parser_add.add_argument("--mode", default="outline", choices=["outline", "notes", "technical", "recipe"], help="AI analysis mode")
+    parser_add.add_argument("--parallel", type=int, default=4, help="Parallel image extraction threads")
+    parser_add.add_argument("--clip", help="Extract a clip (format HH:MM:SS-HH:MM:SS)")
+    parser_add.add_argument("--video-file", help="Local video file for clipping")
+
+    # Command: ls
+    subparsers.add_parser("ls", aliases=["list"], parents=[common_parser], help="List local projects")
+
+    # Command: rm
+    parser_rm = subparsers.add_parser("rm", aliases=["delete"], parents=[common_parser], help="Remove a local project")
+    parser_rm.add_argument("slug", nargs="?", help="Project slug to remove")
+
+    # Command: archive
+    parser_archive = subparsers.add_parser("archive", parents=[common_parser], help="Archive a processed video")
+    parser_archive.add_argument("slug", nargs="?", help="Project slug to archive")
+
+    # Command: push
+    parser_push = subparsers.add_parser("push", aliases=["sync"], parents=[common_parser], help="Push local metadata to remote")
+    parser_push.add_argument("slug", nargs="?", help="Project slug to push")
+
+    # Command: share
+    parser_share = subparsers.add_parser("share", parents=[common_parser], help="Generate shareable remote URL")
+    parser_share.add_argument("slug", nargs="?", help="Project slug to share")
+
+    # Command: config
+    subparsers.add_parser("config", aliases=["setup"], parents=[common_parser], help="Configure remote integration")
+
+    # Command: remote
+    subparsers.add_parser("remote", parents=[common_parser], help="Check remote status")
+
+    return parser
+
+def cmd_interactive(args):
+    print(f"{CLI_COLOR_CYAN}--- Tube2Txt Interactive Forge ---{CLI_COLOR_RESET}")
+    url = input("Enter YouTube URL: ").strip()
+    if not url:
+        print("Error: URL is required.")
+        return
+    
+    slug = input("Enter project slug (optional, press Enter for default): ").strip()
+    if not slug:
+        slug = "default"
+        
+    ai_choice = input("Run AI analysis? (y/n, default y): ").strip().lower()
+    ai_flag = ai_choice != 'n'
+    
+    # Create a dummy args object
+    class DummyArgs:
+        def __init__(self, url, slug, ai_flag, db, projects_dir, mode, parallel):
+            self.url = url
+            self.slug_or_url = slug
+            self.ai = ai_flag
+            self.db = db
+            self.projects_dir = projects_dir
+            self.mode = mode
+            self.parallel = parallel
+            self.clip = None
+            self.video_file = None
+
+    interactive_args = DummyArgs(url, slug, ai_flag, args.db, args.projects_dir, "outline", 4)
+    cmd_add(interactive_args)
+
+def normalize_command(command_name):
+    """Map aliases to canonical command names."""
+    if command_name in ["url", "process"]: return "add"
+    if command_name == "list": return "ls"
+    if command_name == "delete": return "rm"
+    if command_name == "sync": return "push"
+    if command_name == "setup": return "config"
+    return command_name
+
+def main():
+    parser = get_parser()
+    
+    # If no arguments, enter interactive mode
+    if len(sys.argv) == 1:
+        args = parser.parse_args(["ls"]) # Just to get default DB paths etc
+        cmd_interactive(args)
+        return
+
+    # If the first argument is not a known command and not a help flag, 
+    # assume it's the 'add' command (legacy support)
+    commands = ["add", "url", "process", "ls", "list", "rm", "delete", "archive", "push", "sync", "share", "config", "setup", "remote"]
+    if sys.argv[1] not in commands and sys.argv[1] not in ["-h", "--help"]:
+        sys.argv.insert(1, "add")
+
+    args = parser.parse_args()
+
+    # Normalize aliases to canonical commands
+    command = normalize_command(args.command)
+
+    if command == "add":
+        cmd_add(args)
+    elif command == "ls":
+        cmd_ls(args)
+    elif command == "rm":
+        cmd_rm(args)
+    elif command == "archive":
+        cmd_archive(args)
+    elif command == "config":
+        cmd_config(args)
+    elif command == "remote":
+        cmd_remote(args)
+    elif command == "push":
+        cmd_push(args)
+    elif command == "share":
+        cmd_share(args)
+    else:
+        parser.print_help()
 
 if __name__ == "__main__":
     main()
