@@ -22,12 +22,45 @@ def config():
     print("This connects your local Forge to your Supabase backend.\n")
     
     env_path = os.path.join("remote", ".env.local")
+    root_env_path = ".env"
     
-    url = input("1. Supabase Project URL: ").strip()
-    anon_key = input("2. Supabase Anon Key (for the web gallery): ").strip()
-    service_key = input("3. Supabase Service Role Key (for the CLI to push data): ").strip()
-    site_url = input("4. Vercel Deployment URL (e.g., https://your-project.vercel.app): ").strip()
-    gemini_key = input("5. Gemini API Key (for AI analysis): ").strip()
+    # Load existing values
+    existing = {
+        "NEXT_PUBLIC_SUPABASE_URL": "",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY": "",
+        "SUPABASE_SERVICE_ROLE_KEY": "",
+        "NEXT_PUBLIC_SITE_URL": "",
+        "GEMINI_API_KEY": "",
+        "SKIP_LOGIN": "false"
+    }
+    
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    if k in existing:
+                        existing[k] = v
+    
+    if os.path.exists(root_env_path):
+        with open(root_env_path, "r") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    if k == "GEMINI_API_KEY":
+                        existing[k] = v
+
+    def prompt_with_default(msg, key):
+        default = existing.get(key, "")
+        val = input(f"{msg} [{default}]: ").strip()
+        return val if val else default
+
+    url = prompt_with_default("1. Supabase Project URL", "NEXT_PUBLIC_SUPABASE_URL")
+    anon_key = prompt_with_default("2. Supabase Anon Key (for the web gallery)", "NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    service_key = prompt_with_default("3. Supabase Service Role Key (for the CLI to push data)", "SUPABASE_SERVICE_ROLE_KEY")
+    site_url = prompt_with_default("4. Vercel Deployment URL (e.g., https://your-project.vercel.app)", "NEXT_PUBLIC_SITE_URL")
+    gemini_key = prompt_with_default("5. Gemini API Key (for AI analysis)", "GEMINI_API_KEY")
+    skip_login = prompt_with_default("6. Skip Login? (true/false)", "SKIP_LOGIN")
     
     if url and anon_key and service_key:
         os.makedirs("remote", exist_ok=True)
@@ -39,11 +72,27 @@ def config():
                 if not site_url.startswith("http"):
                     site_url = f"https://{site_url}"
                 f.write(f"NEXT_PUBLIC_SITE_URL={site_url}\n")
+            f.write(f"SKIP_LOGIN={skip_login.lower()}\n")
         
         # Save Gemini Key to root .env for CLI usage
         if gemini_key:
-            with open(".env", "a") as f:
-                f.write(f"\nGEMINI_API_KEY={gemini_key}\n")
+            # Read existing .env to check if key already exists to avoid duplication
+            lines = []
+            key_exists = False
+            if os.path.exists(root_env_path):
+                with open(root_env_path, "r") as f:
+                    for line in f:
+                        if line.startswith("GEMINI_API_KEY="):
+                            lines.append(f"GEMINI_API_KEY={gemini_key}\n")
+                            key_exists = True
+                        else:
+                            lines.append(line)
+            
+            if not key_exists:
+                lines.append(f"\nGEMINI_API_KEY={gemini_key}\n")
+            
+            with open(root_env_path, "w") as f:
+                f.writelines(lines)
             print(f"✅ Gemini Key saved to .env")
         
         print(f"\n✅ Remote configuration saved to {env_path}")
