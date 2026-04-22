@@ -6,9 +6,9 @@
 
 ---
 
-**Project:** MyTubeScripts
-**Generated:** 2026-04-22 01:55:23
-**Category:** Service Landing Page
+**Project:** MyTubeScripts Remote Gallery
+**Category:** Dystopian Landing Page & App
+**Style:** Cyberpunk, Neon, Dark Mode, Glassmorphism
 
 ---
 
@@ -18,24 +18,24 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#0EA5E9` | `--color-primary` |
-| Secondary | `#38BDF8` | `--color-secondary` |
-| CTA/Accent | `#F97316` | `--color-cta` |
-| Background | `#F0F9FF` | `--color-background` |
-| Text | `#0C4A6E` | `--color-text` |
+| Primary/Neon | `#00FF41` | `--color-primary` (Matrix Green) |
+| Secondary | `#FF003C` | `--color-secondary` (Cyberpunk Red) |
+| Accent/Glow | `#00F0FF` | `--color-accent` (Neon Cyan) |
+| Background | `#0D0E15` | `--color-background` (Deep Void) |
+| Surface/Glass | `rgba(20, 22, 35, 0.6)`| `--color-surface` |
+| Text Primary | `#E0E6ED` | `--color-text` |
+| Text Muted | `#8A95A5` | `--color-text-muted` |
 
-**Color Notes:** Sky blue trust + warm CTA
+**Color Notes:** High contrast neon accents on an abyssal dark background. Glow effects using box-shadows.
 
 ### Typography
 
-- **Heading Font:** Space Grotesk
-- **Body Font:** DM Sans
-- **Mood:** tech, startup, modern, innovative, bold, futuristic
-- **Google Fonts:** [Space Grotesk + DM Sans](https://fonts.google.com/share?selection.family=DM+Sans:wght@400;500;700|Space+Grotesk:wght@400;500;600;700)
-
-**CSS Import:**
+- **Heading Font:** Orbitron or Share Tech Mono
+- **Body Font:** Inter or Roboto Mono
+- **Mood:** dystopian, hacker, terminal, futuristic, sleek
+- **Google Fonts:**
 ```css
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@400;500;600&family=Share+Tech+Mono&display=swap');
 ```
 
 ### Spacing Variables
@@ -50,157 +50,123 @@
 | `--space-2xl` | `48px` / `3rem` | Section margins |
 | `--space-3xl` | `64px` / `4rem` | Hero padding |
 
-### Shadow Depths
+### Shadow & Glow Depths
 
 | Level | Value | Usage |
 |-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+| `--glow-primary` | `0 0 10px rgba(0, 255, 65, 0.5), 0 0 20px rgba(0, 255, 65, 0.3)` | Primary buttons/cards |
+| `--glow-secondary`| `0 0 10px rgba(255, 0, 60, 0.5), 0 0 20px rgba(255, 0, 60, 0.3)` | Alerts/Warnings |
+| `--glow-accent` | `0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3)`| Links, timestamps |
+| `--glass-border`| `1px solid rgba(255, 255, 255, 0.1)` | Glassmorphism card borders |
 
 ---
 
 ## Component Specs
 
+### Glassmorphism Cards
+
+```css
+.card-glass {
+  background: var(--color-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: var(--glass-border);
+  border-radius: 4px; /* Sharp corners for cyberpunk feel */
+  padding: 24px;
+  transition: all 300ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Cyberpunk decorative corner cut or top border */
+.card-glass::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 2px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+.card-glass:hover::before {
+  opacity: 1;
+}
+
+.card-glass:hover {
+  box-shadow: var(--glow-accent);
+  transform: translateY(-2px);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+```
+
 ### Buttons
 
 ```css
-/* Primary Button */
-.btn-primary {
-  background: #F97316;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Secondary Button */
-.btn-secondary {
+/* Primary Neon Button */
+.btn-neon {
   background: transparent;
-  color: #0EA5E9;
-  border: 2px solid #0EA5E9;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
+  font-family: 'Share Tech Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 2px;
   transition: all 200ms ease;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-neon:hover {
+  background: var(--color-primary);
+  color: var(--color-background);
+  box-shadow: var(--glow-primary);
 }
 ```
 
-### Cards
+### Timestamp Links (YouTube)
 
 ```css
-.card {
-  background: #F0F9FF;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
+.timestamp-link {
+  color: var(--color-accent);
+  font-family: 'Share Tech Mono', monospace;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--color-accent);
   transition: all 200ms ease;
-  cursor: pointer;
 }
 
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
-
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #0EA5E9;
-  outline: none;
-  box-shadow: 0 0 0 3px #0EA5E920;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
+.timestamp-link:hover {
+  color: white;
+  background: var(--color-accent);
+  border-bottom: 1px solid transparent;
+  box-shadow: 0 0 8px var(--color-accent);
+  padding: 0 4px;
 }
 ```
 
 ---
 
-## Style Guidelines
+## Layout Structure
 
-**Style:** Social Proof-Focused
+**Pages:**
+1. **Landing Page:** Hero section with neon glitch effects, "How-to run your own local analyzer" section, featured gallery, Creator Spotlight.
+2. **Featured Gallery:** Grid of processed video scripts (Glassmorphism cards).
+3. **Video Detail Page:** Transcript view with sparse screenshots (at key timestamps).
+4. **How-To Page:** Quick instructions on setting up Tube2Txt locally.
 
-**Keywords:** Testimonials prominent, client logos displayed, case studies sections, reviews/ratings, user avatars, success metrics, credibility markers
-
-**Best For:** B2B SaaS, professional services, premium products, e-commerce conversion pages, established brands
-
-**Key Effects:** Testimonial carousel animations, logo grid fade-in, stat counter animations (number count-up), review star ratings
-
-### Page Pattern
-
-**Pattern Name:** Horizontal Scroll Journey
-
-- **Conversion Strategy:** Immersive product discovery. High engagement. Keep navigation visible.
-28,Bento Grid Showcase,bento,  grid,  features,  modular,  apple-style,  showcase", 1. Hero, 2. Bento Grid (Key Features), 3. Detail Cards, 4. Tech Specs, 5. CTA, Floating Action Button or Bottom of Grid, Card backgrounds: #F5F5F7 or Glass. Icons: Vibrant brand colors. Text: Dark., Hover card scale (1.02), video inside cards, tilt effect, staggered reveal, Scannable value props. High information density without clutter. Mobile stack.
-29,Interactive 3D Configurator,3d,  configurator,  customizer,  interactive,  product", 1. Hero (Configurator), 2. Feature Highlight (synced), 3. Price/Specs, 4. Purchase, Inside Configurator UI + Sticky Bottom Bar, Neutral studio background. Product: Realistic materials. UI: Minimal overlay., Real-time rendering, material swap animation, camera rotate/zoom, light reflection, Increases ownership feeling. 360 view reduces return rates. Direct add-to-cart.
-30,AI-Driven Dynamic Landing,ai,  dynamic,  personalized,  adaptive,  generative", 1. Prompt/Input Hero, 2. Generated Result Preview, 3. How it Works, 4. Value Prop, Input Field (Hero) + 'Try it' Buttons, Adaptive to user input. Dark mode for compute feel. Neon accents., Typing text effects, shimmering generation loaders, morphing layouts, Immediate value demonstration. 'Show, don't tell'. Low friction start.
-- **CTA Placement:** Floating Sticky CTA or End of Horizontal Track
-- **Section Order:** 1. Intro (Vertical), 2. The Journey (Horizontal Track), 3. Detail Reveal, 4. Vertical Footer
-
----
-
-## Anti-Patterns (Do NOT Use)
-
-- ❌ Complex navigation
-- ❌ Hidden contact info
-
-### Additional Forbidden Patterns
-
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
+**Content Rules:**
+- **No Video Uploads:** Display sparse images only.
+- **Timestamps:** Every timestamp must be a `<a href="https://youtube.com/watch?v=ID&t=SECONDS">` link.
+- **Data Fetching:** Pull metadata from Supabase, linking out to YouTube for playback.
 
 ---
 
 ## Pre-Delivery Checklist
 
-Before delivering any UI code, verify:
-
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+Before delivering UI code, verify:
+- [ ] Neon glow effects do not cause performance stuttering (use opacity/box-shadow carefully).
+- [ ] Glassmorphism background blur uses `-webkit-backdrop-filter` for Safari support.
+- [ ] Text contrast on dark backgrounds is at least 4.5:1.
+- [ ] No actual video files are hosted or embedded (only images and YouTube links).
+- [ ] Hover states provide strong visual feedback (glow, color inversion).
+- [ ] Typography sets the right dystopian mood (monospaced accents, sans-serif body).
