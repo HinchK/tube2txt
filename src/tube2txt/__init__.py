@@ -181,40 +181,37 @@ class GeminiClient:
             'outline': (
                 "Provide a clear, high-level markdown outline of the content. "
                 "Include timestamps in brackets [HH:MM:SS] for each section. "
-                "Adhere to 'The Elements of Style' (1918): omit needless words, "
-                "be specific, concrete, and definite."
+                "Format the entire output in Markdown."
             ),
             'notes': (
-                "Create detailed study notes from this transcript. "
-                "Adhere strictly to the principles of 'The Elements of Style' (1918): "
-                "Be clear, concise, and use the active voice. Omit needless words. "
-                "Include key takeaways, definitions of complex terms, and a summary for each major section. "
-                "Use timestamps in brackets [HH:MM:SS]."
+                "Create detailed Intelligence Brief (Notes) from this transcript. "
+                "Format the entire output in Markdown. "
+                "Start the notes with a very quippy, irreverently silly synopsis of the video content. "
+                "Write the entirety of the Intelligence Brief Notes in the voice and persona of Prot (played by Kevin Spacey) from the movie K-PAX. "
+                "You are delivering an earnest, slightly detached, yet fascinated debrief on an alien cultural phenomenon (humanity) based on the video you just observed. "
+                "Use timestamps in brackets [HH:MM:SS] to reference specific moments."
             ),
             'recipe': (
                 "Extract recipes, ingredients, and cooking steps from this transcript. "
-                "Follow 'The Elements of Style' (1918): use the active voice for instructions, "
-                "be specific and definite, and omit needless words. "
+                "Format the entire output in Markdown. "
                 "Format them clearly in markdown with timestamps [HH:MM:SS]."
             ),
             'technical': (
                 "Provide a technical deep-dive or documentation based on this transcript. "
-                "Adhere to 'The Elements of Style' (1918): use definite, specific, concrete language. "
-                "Omit needless words. Focus on implementation details, code concepts, and architectural points. "
+                "Format the entire output in Markdown. "
+                "Focus on implementation details, code concepts, and architectural points. "
                 "Use timestamps in brackets [HH:MM:SS]."
             ),
             'clips': (
                 "Identify the 3 most interesting, viral, or high-value 30-60 second segments from this video. "
-                "In your descriptions, follow 'The Elements of Style' (1918): "
-                "use active voice, be specific, and omit needless words. "
+                "Format the entire output in Markdown. "
                 "For each, provide:\n"
                 "1. A catchy title.\n"
                 "2. Start and End timestamps (format: HH:MM:SS-HH:MM:SS).\n"
                 "3. A brief reason why it's a great clip.\n"
                 "Return ONLY the data in this format:\n"
                 "CLIP:[Title]|[HH:MM:SS-HH:MM:SS]|[Reason]\n"
-                "After the CLIP: lines, you may provide a brief markdown summary of why these clips represent the essence of the video, "
-                "maintaining a concise, vigorous style."
+                "After the CLIP: lines, you may provide a brief markdown summary of why these clips represent the essence of the video."
             )
         }
 

@@ -26,7 +26,8 @@ def config():
     url = input("1. Supabase Project URL: ").strip()
     anon_key = input("2. Supabase Anon Key (for the web gallery): ").strip()
     service_key = input("3. Supabase Service Role Key (for the CLI to push data): ").strip()
-    gemini_key = input("4. Gemini API Key (for AI analysis): ").strip()
+    site_url = input("4. Vercel Deployment URL (e.g., https://your-project.vercel.app): ").strip()
+    gemini_key = input("5. Gemini API Key (for AI analysis): ").strip()
     
     if url and anon_key and service_key:
         os.makedirs("remote", exist_ok=True)
@@ -34,6 +35,10 @@ def config():
             f.write(f"NEXT_PUBLIC_SUPABASE_URL={url}\n")
             f.write(f"NEXT_PUBLIC_SUPABASE_ANON_KEY={anon_key}\n")
             f.write(f"SUPABASE_SERVICE_ROLE_KEY={service_key}\n")
+            if site_url:
+                if not site_url.startswith("http"):
+                    site_url = f"https://{site_url}"
+                f.write(f"NEXT_PUBLIC_SITE_URL={site_url}\n")
         
         # Save Gemini Key to root .env for CLI usage
         if gemini_key:
@@ -111,7 +116,8 @@ def push(slug, db_path="tube2txt.db", projects_dir="projects"):
         "date": datetime.now().isoformat()
     }
     
-    resp = requests.post(f"{url}/rest/v1/videos", headers=headers, json=video_payload)
+    # Use on_conflict=slug to handle existing projects
+    resp = requests.post(f"{url}/rest/v1/videos?on_conflict=slug", headers=headers, json=video_payload)
     if resp.status_code >= 400:
         print(f"Failed to sync video record: {resp.text}")
         return
@@ -145,24 +151,37 @@ def push(slug, db_path="tube2txt.db", projects_dir="projects"):
         "vid_id": vid_id
     }
     
-    # Use Prefer: resolution=merge-duplicates to upsert based on vid_id
-    resp = requests.post(f"{url}/rest/v1/metadata", headers=headers, json=meta_payload)
+    # Use on_conflict=vid_id to upsert based on vid_id
+    resp = requests.post(f"{url}/rest/v1/metadata?on_conflict=vid_id", headers=headers, json=meta_payload)
     if resp.status_code >= 400:
         print(f"Failed to sync metadata: {resp.text}")
         return
 
-    # Update local DB last_synced_at
+    # Update local DB last_synced_at and remote_url
+    remote_url = get_remote_url(slug)
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE videos SET last_synced_at = ? WHERE slug = ?", (datetime.now().isoformat(), slug))
+        cursor.execute(
+            "UPDATE videos SET last_synced_at = ?, remote_url = ? WHERE slug = ?", 
+            (datetime.now().isoformat(), remote_url, slug)
+        )
         conn.commit()
 
     print(f"✅ Successfully synced '{slug}' to remote.")
 
 
 def get_remote_url(slug=None):
-    # This is a stub for generating the live URL
-    base = "https://your-deployment-url.vercel.app"
+    """Generate the live gallery URL."""
+    env_path = os.path.join("remote", ".env.local")
+    base = "https://tube2txt-edg3ejjii-hinchks-projects.vercel.app"
+    
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                if line.startswith("NEXT_PUBLIC_SITE_URL="):
+                    base = line.strip().split("=", 1)[1]
+                    break
+
     if slug:
         return f"{base}/v/{slug}"
     return base
