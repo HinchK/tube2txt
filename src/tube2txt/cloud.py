@@ -45,23 +45,21 @@ def config():
 def push(slug, db_path="tube2txt.db", projects_dir="projects"):
     """Sync a local project to the Supabase remote."""
     if not requests:
-        raise ImportError("The 'requests' module is required for remote sync. Install with pip install requests")
+        print("Error: The 'requests' module is required for remote sync.")
+        print("Run: pip install requests")
+        return
 
-    # Verify slug exists in local DB first
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT title, url FROM videos WHERE slug = ?", (slug,))
-        row = cursor.fetchone()
-        if not row:
-            raise ValueError(f"Error: Slug '{slug}' not found in local DB.")
-        title, video_url = row
-        cursor.execute("SELECT start_ts, seconds, text FROM segments WHERE video_id = (SELECT id FROM videos WHERE slug = ?)", (slug,))
-        segments = [{"start": r[0], "seconds": r[1], "text": r[2]} for r in cursor.fetchall()]
-
-    # Load remote configuration
     env_path = os.path.join("remote", ".env.local")
     if not os.path.exists(env_path):
-        raise FileNotFoundError("Remote gallery not configured. Run 'tube2txt config' first.")
+        print("Remote gallery not configured.")
+        choice = input("Would you like to run 'tube2txt setup' now? (y/n): ").strip().lower()
+        if choice == 'y':
+            config()
+            if not os.path.exists(env_path):
+                return
+        else:
+            print("Sync cancelled. Run 'tube2txt setup' when you are ready.")
+            return
 
     url = None
     key = None
@@ -72,10 +70,12 @@ def push(slug, db_path="tube2txt.db", projects_dir="projects"):
             elif line.startswith("SUPABASE_SERVICE_ROLE_KEY="):
                 key = line.strip().split("=", 1)[1]
             elif line.startswith("NEXT_PUBLIC_SUPABASE_ANON_KEY=") and not key:
+                # Fallback to anon key if service key not found
                 key = line.strip().split("=", 1)[1]
 
     if not url or not key:
-        raise ValueError("Error: Missing credentials in remote/.env.local")
+        print("Error: Missing credentials in remote/.env.local")
+        return
 
     headers = {
         "apikey": key,
@@ -84,19 +84,39 @@ def push(slug, db_path="tube2txt.db", projects_dir="projects"):
         "Prefer": "resolution=merge-duplicates"
     }
 
-    # Push video metadata
-    video_payload = {"slug": slug, "title": title, "date": datetime.now().isoformat()}
+    # Fetch local DB data
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT title, url FROM videos WHERE slug = ?", (slug,))
+        row = cursor.fetchone()
+        if not row:
+            print(f"Error: Slug '{slug}' not found in local DB.")
+            return
+        title, video_url = row
+
+        cursor.execute("SELECT start_ts, seconds, text FROM segments WHERE video_id = (SELECT id FROM videos WHERE slug = ?)", (slug,))
+        segments = [{"start": r[0], "seconds": r[1], "text": r[2]} for r in cursor.fetchall()]
+
+    # Push to 'videos' table
+    video_payload = {
+        "slug": slug,
+        "title": title,
+        "date": datetime.now().isoformat()
+    }
+    
     resp = requests.post(f"{url}/rest/v1/videos", headers=headers, json=video_payload)
     if resp.status_code >= 400:
-        raise RuntimeError(f"Failed to sync video record: {resp.text}")
+        print(f"Failed to sync video record: {resp.text}")
+        return
 
-    # Retrieve video ID for metadata linking
+    # Get the ID of the video from Supabase to use as vid_id
     resp = requests.get(f"{url}/rest/v1/videos?slug=eq.{slug}&select=id", headers=headers)
     if resp.status_code >= 400 or not resp.json():
-        raise RuntimeError(f"Failed to fetch video ID for metadata sync: {resp.text}")
+        print(f"Failed to fetch video ID for metadata sync: {resp.text}")
+        return
     vid_id = resp.json()[0]['id']
 
-    # Bundle additional metadata files
+    # Bundle metadata (outline, etc)
     project_path = os.path.join(projects_dir, slug)
     metadata_bundle = {}
     for md_file in ["TUBE2TXT-OUTLINE.md", "TUBE2TXT-NOTES.md", "TUBE2TXT-CLIPS.md", "TUBE2TXT-RECIPE.md", "TUBE2TXT-TECHNICAL.md"]:
@@ -106,19 +126,30 @@ def push(slug, db_path="tube2txt.db", projects_dir="projects"):
                 content = f.read()
             mtype = md_file.split("-")[1].split(".")[0].lower()
             metadata_bundle[mtype] = content
+
     if segments:
         metadata_bundle["transcript"] = segments
 
-    meta_payload = {"video_slug": slug, "type": "bundle", "content": json.dumps(metadata_bundle), "vid_id": vid_id}
+    # Upsert single metadata record
+    meta_payload = {
+        "video_slug": slug,
+        "type": "bundle",
+        "content": json.dumps(metadata_bundle),
+        "vid_id": vid_id
+    }
+    
+    # Use Prefer: resolution=merge-duplicates to upsert based on vid_id
     resp = requests.post(f"{url}/rest/v1/metadata", headers=headers, json=meta_payload)
     if resp.status_code >= 400:
-        raise RuntimeError(f"Failed to sync metadata: {resp.text}")
+        print(f"Failed to sync metadata: {resp.text}")
+        return
 
-    # Update local DB sync timestamp
+    # Update local DB last_synced_at
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE videos SET last_synced_at = ? WHERE slug = ?", (datetime.now().isoformat(), slug))
         conn.commit()
+
     print(f"✅ Successfully synced '{slug}' to remote.")
 
 
