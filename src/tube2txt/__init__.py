@@ -40,21 +40,8 @@ def get_video_id(url):
             return match.group(1)
     return None
 
-def load_cookies_to_session(session, cookies_path):
-    """Load Netscape-format cookies.txt into a requests.Session."""
-    import http.cookiejar
-    if cookies_path and os.path.exists(cookies_path):
-        try:
-            cj = http.cookiejar.MozillaCookieJar(cookies_path)
-            cj.load(ignore_discard=True, ignore_expires=True)
-            session.cookies.update(cj)
-            return True
-        except Exception as e:
-            print(f"Error loading cookies from {cookies_path}: {e}")
-    return False
-
 def fetch_transcript_api(video_id, languages=['en', 'de'], on_progress=None):
-    """Uses YouTubeTranscriptApi.fetch to fetch the transcript, with proxy and cookie support."""
+    """Uses YouTubeTranscriptApi.fetch to fetch the transcript."""
     from youtube_transcript_api import (
         YouTubeTranscriptApi, 
         IpBlocked, 
@@ -62,47 +49,12 @@ def fetch_transcript_api(video_id, languages=['en', 'de'], on_progress=None):
         TranscriptsDisabled,
         NoTranscriptFound
     )
-    from youtube_transcript_api.proxies import GenericProxyConfig
     import requests
 
-    session = requests.Session()
-    
-    # Try to load cookies from standard locations
-    cookies_path = os.environ.get("YT_DLP_COOKIES")
-    if not cookies_path:
-        possible_paths = [
-            os.path.join(os.getcwd(), "cookies.txt"),
-            os.path.join(os.getcwd(), "src", "cookies.txt"),
-            os.path.join(os.getcwd(), "projects", "cookies.txt")
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                cookies_path = p
-                break
-    
-    if cookies_path:
-        if load_cookies_to_session(session, cookies_path):
-            _notify(on_progress, "status", "api", f"Transcript API: Loaded cookies from {cookies_path}")
-        else:
-            _notify(on_progress, "status", "api", f"Transcript API: Failed to load cookies from {cookies_path}")
-
-    # Support proxies via environment variables
-    proxy_config = None
-    http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
-    https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
-    
-    if http_proxy or https_proxy:
-        proxy_config = GenericProxyConfig(
-            http_url=http_proxy,
-            https_url=https_proxy or http_proxy
-        )
-        _notify(on_progress, "status", "api", f"Transcript API: Using proxy configuration.")
-
     try:
-        # Create an instance with our custom session and proxy config
-        ytt_api = YouTubeTranscriptApi(http_client=session, proxy_config=proxy_config)
-        transcript = ytt_api.fetch(video_id, languages=languages)
-        return transcript.to_raw_data()
+        # Create an instance without custom session/cookies
+        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+        return transcript
     except (IpBlocked, RequestBlocked):
         _notify(on_progress, "status", "api", f"Transcript API: IP is blocked or request rate-limited.")
         return None
@@ -406,23 +358,7 @@ def download_video(url, output_dir, on_progress=None):
     
     # 1. Prepare base command
     base_cmd = ["yt-dlp", "--no-warnings"]
-    
-    # Add cookies if available
-    cookies_path = os.environ.get("YT_DLP_COOKIES")
-    if not cookies_path:
-        possible_paths = [
-            os.path.join(os.getcwd(), "cookies.txt"),
-            os.path.join(os.getcwd(), "src", "cookies.txt"),
-            os.path.join(os.getcwd(), "projects", "cookies.txt")
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                cookies_path = p
-                break
 
-    if cookies_path and os.path.exists(cookies_path):
-        _notify(on_progress, "status", "download", f"Using cookies from: {cookies_path}")
-        base_cmd.extend(["--cookies", cookies_path])
 
     # 2. First Pass: Attempt full download (Video + Subtitles)
     full_cmd = base_cmd + [
@@ -773,8 +709,51 @@ def get_parser():
     return parser
 
 
+def cmd_interactive(args):
+    print(f"{CLI_COLOR_CYAN}--- Tube2Txt Interactive Forge ---{CLI_COLOR_RESET}")
+    url = input("Enter YouTube URL: ").strip()
+    if not url:
+        print("Error: URL is required.")
+        return
+    
+    slug = input("Enter project slug (optional, press Enter for default): ").strip()
+    if not slug:
+        slug = "default"
+        
+    ai_choice = input("Run AI analysis? (y/n, default y): ").strip().lower()
+    ai_flag = ai_choice != 'n'
+    
+    # Create a dummy args object
+    class DummyArgs:
+        def __init__(self, url, slug, ai_flag, db, projects_dir, mode, parallel):
+            self.url = url
+            self.slug_or_url = slug
+            self.ai = ai_flag
+            self.db = db
+            self.projects_dir = projects_dir
+            self.mode = mode
+            self.parallel = parallel
+            self.clip = None
+            self.video_file = None
+
+    interactive_args = DummyArgs(url, slug, ai_flag, args.db, args.projects_dir, "outline", 4)
+    cmd_url(interactive_args)
+
 def main():
     parser = get_parser()
+    
+    # If no arguments, enter interactive mode
+    if len(sys.argv) == 1:
+        args = parser.parse_args(["list"]) # Just to get default DB paths etc
+        cmd_interactive(args)
+        return
+
+    # If the first argument is not a known command and not a help flag, 
+    # assume it's the 'url' command (legacy support)
+    commands = ["url", "process", "list", "delete", "archive", "setup", "remote", "sync", "share"]
+    if sys.argv[1] not in commands and sys.argv[1] not in ["-h", "--help"]:
+        sys.argv.insert(1, "url")
+
     args = parser.parse_args()
 
     if args.command == "url" or args.command == "process":
@@ -794,15 +773,7 @@ def main():
     elif args.command == "share":
         cmd_share(args)
     else:
-        # Fallback to legacy if no subcommand matched, but we can't easily without args inspection.
-        # Check if first arg is likely a URL or slug and route to 'url'
-        if len(sys.argv) > 1 and sys.argv[1] not in ["url", "process", "list", "delete", "archive", "setup", "remote", "sync", "share"]:
-            # Re-parse treating it as 'url'
-            sys.argv.insert(1, "url")
-            args = parser.parse_args()
-            cmd_url(args)
-        else:
-            parser.print_help()
+        parser.print_help()
 
 if __name__ == "__main__":
     main()

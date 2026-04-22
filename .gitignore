@@ -57,3 +57,4 @@ GEM-PLAN/
 .vscode/
 .claude/settings.local.json
 .worktrees
+remote/

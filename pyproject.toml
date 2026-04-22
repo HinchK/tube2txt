@@ -25,6 +25,7 @@ dependencies = [
     "yt-dlp",
     "websockets",
     "youtube-transcript-api",
+    "requests",
 ]
 
 [project.scripts]
