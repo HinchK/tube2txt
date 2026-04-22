@@ -1,71 +1,44 @@
-# MyTubeScripts Forge - CLI Help Guide
+# Tube2Txt Forge - CLI Help Guide
 
-Welcome to the **Tube2Txt** command-line tool. This tool acts as the "Forge" for your personal video archive, allowing you to process YouTube videos locally and sync them to a remote gallery.
-
----
-
-## 🚀 Quick Start
-
-If you run `tube2txt` without any arguments, it will enter **Interactive Mode** and walk you through the process:
-
-```bash
-uv run tube2txt
-```
+Tube2Txt is a "Local-First" video intelligence forge. It processes YouTube videos into structured Markdown archives locally on your machine and pushes them to your remote Supabase gallery.
 
 ---
 
-## 🛠 Command Reference
+## 🛠 Command Standard (Git-Style)
 
-### 1. Process a Video (`url` or `process`)
-Decodes a YouTube video, extracts transcripts, and generates AI analysis.
+Tube2Txt uses industry-standard verbs. If you omit a required argument (like a URL or a Project Slug), the tool will guide you through an interactive selection or prompt.
 
-**Usage:**
+### 1. Process Video (`add`)
+Adds a YouTube video to your local forge.
 ```bash
-uv run tube2txt <URL> [SLUG]
-# OR
-uv run tube2txt url <URL> [SLUG]
+uv run tube2txt add "https://www.youtube.com/watch?v=..."
+```
+- **Progressive Disclosure**: Running `tube2txt add` without a URL will launch the **Interactive Forge**.
+- **Legacy Support**: `uv run tube2txt "URL"` still works as a shortcut.
+
+### 2. List Archives (`ls`)
+Lists all locally processed videos and their sync status.
+```bash
+uv run tube2txt ls
 ```
 
-**Options:**
-- `--ai`: Force-run AI generation (automatic if `GEMINI_API_KEY` is set).
-- `--mode [outline|notes|technical|recipe]`: Choose the deep-dive analysis type.
-- `--parallel N`: Use N threads for image extraction (default: 4).
-
-> [!TIP]
-> Always quote your YouTube URLs to avoid shell issues: `uv run tube2txt "https://..."`
-
-### 2. List Archives (`list`)
-Shows all locally processed videos and their sync status.
-
+### 3. Push to Remote (`push`)
+Uploads local metadata and transcripts to your remote Supabase gallery.
 ```bash
-uv run tube2txt list
+uv run tube2txt push [SLUG]
+```
+- **Progressive Disclosure**: If `SLUG` is omitted, you will be presented with a numbered list of unsynced local projects to choose from.
+
+### 4. Configuration (`config`)
+Sets up your Supabase Project URL, API Keys, and Gemini credentials.
+```bash
+uv run tube2txt config
 ```
 
-### 3. Sync to Remote (`sync`)
-Pushes local metadata and transcripts to your Supabase-backed remote gallery.
-
-```bash
-uv run tube2txt sync <SLUG>
-```
-
-### 4. Remote Management (`setup`, `remote`, `share`)
-- `setup`: Configure your Supabase/Remote environment.
-- `remote`: Check the status and URL of your live gallery.
-- `share <SLUG>`: Generate a direct link to a video on your remote site.
-
-### 5. Maintenance (`archive`, `delete`)
-- `archive <SLUG>`: Marks a project as archived in the DB.
-- `delete <SLUG>`: Permanently removes the project folder and DB entry.
-
----
-
-## 💾 Database Setup
-
-Before you can sync, you must set up your Supabase database:
-1. Open your Supabase Project Dashboard.
-2. Go to the **SQL Editor**.
-3. Copy and run the contents of [supabase_schema.sql](file:///Users/hinchk/jkh/TUBE2TXT/tube2txt-repo/supabase_schema.sql).
-4. This will create the `videos` and `metadata` tables and set up public read access.
+### 5. Management (`rm`, `archive`, `share`)
+- `rm [SLUG]`: Permanently removes a local project and its directory.
+- `archive [SLUG]`: Marks a project as archived in the local database.
+- `share [SLUG]`: Displays the remote URL for a synced video.
 
 ---
 
@@ -74,7 +47,7 @@ Before you can sync, you must set up your Supabase database:
 Tube2Txt uses two levels of security:
 
 ### 1. Forge Sync (CLI)
-When you run `tube2txt setup`, you are asked for a **Service Role Key**. This allows your local CLI to push data directly to your Supabase tables while bypassing Row Level Security (RLS). **Keep this key private.**
+When you run `tube2txt config`, you are asked for a **Service Role Key**. This allows your local CLI to push data directly to your Supabase tables while bypassing Row Level Security (RLS). **Keep this key private.**
 
 ### 2. Web Gallery (Frontend)
 When you access the remote site, you must sign in with a standard user account.
@@ -86,10 +59,5 @@ When you access the remote site, you must sign in with a standard user account.
 ## 🔧 Troubleshooting
 
 - **"zsh: no matches found"**: This happens when a URL contains special characters like `?`. **Always put URLs in quotes**.
-- **Supabase Sync fails**: Run `tube2txt setup` to ensure your credentials are correct in `remote/.env.local`.
-- **Images missing**: Ensure `ffmpeg` is installed on your system.
-
----
-
-## 🌐 Architecture Note
-**No video files are ever uploaded to the server.** The Forge (your local machine) handles the heavy lifting. The Remote Gallery only stores metadata, transcripts, and sparse image links to ensure privacy and low hosting costs.
+- **Database Error**: If you see "Slug not found," ensure you are running the command in the same directory where your `tube2txt.db` is located.
+- **Missing AI Analysis**: Ensure `GEMINI_API_KEY` is set in your environment or configured via `tube2txt config`.

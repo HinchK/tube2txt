@@ -556,7 +556,8 @@ def process_video(url, slug, mode="outline", ai_flag=True, db_path="tube2txt.db"
     return project_path
 
 
-def cmd_list(args):
+def cmd_ls(args):
+    """List local projects."""
     db = Database(args.db)
     with sqlite3.connect(db.db_path) as conn:
         cursor = conn.cursor()
@@ -568,52 +569,116 @@ def cmd_list(args):
             sync_status = row[6] if row[6] else 'Never'
             print(f"{row[0]:<5} | {row[1]:<20} | {row[3]:<20} | {(row[4] or 'None'):<25} | {sync_status}")
 
-def cmd_delete(args):
-    print(f"Deleting project: {args.slug}")
+def cmd_rm(args):
+    """Remove a local project."""
+    slug = args.slug
+    if not slug:
+        slug = _select_project(args)
+    if not slug:
+        return
+
+    print(f"Removing project: {slug}")
     db = Database(args.db)
     with sqlite3.connect(db.db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM videos WHERE slug = ?", (args.slug,))
+        cursor.execute("SELECT id FROM videos WHERE slug = ?", (slug,))
         row = cursor.fetchone()
         if not row:
-            print(f"Slug {args.slug} not found in DB.")
+            print(f"Slug {slug} not found in DB.")
             return
         video_id = row[0]
         cursor.execute("DELETE FROM segments WHERE video_id = ?", (video_id,))
         cursor.execute("DELETE FROM videos WHERE id = ?", (video_id,))
         conn.commit()
-    project_path = os.path.join(args.projects_dir, args.slug)
+    project_path = os.path.join(args.projects_dir, slug)
     if os.path.exists(project_path):
         shutil.rmtree(project_path)
         print(f"Removed directory: {project_path}")
 
 def cmd_archive(args):
-    print(f"Archiving project: {args.slug}")
+    """Archive a project."""
+    slug = args.slug
+    if not slug:
+        slug = _select_project(args)
+    if not slug:
+        return
+
+    print(f"Archiving project: {slug}")
     db = Database(args.db)
     with sqlite3.connect(db.db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE videos SET is_archived = 1 WHERE slug = ?", (args.slug,))
+        cursor.execute("UPDATE videos SET is_archived = 1 WHERE slug = ?", (slug,))
         conn.commit()
 
-from tube2txt.cloud import setup_remote, sync_project, get_remote_url
+from tube2txt.cloud import config, push, get_remote_url
 
-def cmd_setup(args):
-    setup_remote()
+def _select_project(args, unsynced_only=False):
+    """Interactively select a project from a numbered list."""
+    db = Database(args.db)
+    query = "SELECT slug, title FROM videos"
+    if unsynced_only:
+        query += " WHERE last_synced_at IS NULL"
+    query += " ORDER BY processed_at DESC"
+    
+    with sqlite3.connect(db.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+    if not rows:
+        if unsynced_only:
+            # Fallback to show all if no unsynced ones found
+            return _select_project(args, unsynced_only=False)
+        print("No projects found.")
+        return None
+        
+    print("\nSelect a project:")
+    for i, row in enumerate(rows[:15]):
+        print(f"[{i+1}] {row[0]} - {row[1]}")
+    
+    choice = input("\nSelect a number (or Enter to cancel): ").strip()
+    if not choice or not choice.isdigit() or int(choice) > len(rows):
+        return None
+    return rows[int(choice)-1][0]
+
+def cmd_config(args):
+    config()
 
 def cmd_remote(args):
     print("Checking remote deployment status...")
     url = get_remote_url()
     print(f"Live Gallery URL: {url}")
 
-def cmd_sync(args):
-    sync_project(args.slug, db_path=args.db, projects_dir=args.projects_dir)
+def cmd_push(args):
+    slug = args.slug
+    if not slug:
+        print("Tip: You can push directly using: tube2txt push [slug]")
+        slug = _select_project(args, unsynced_only=True)
+    if slug:
+        push(slug, db_path=args.db, projects_dir=args.projects_dir)
 
 def cmd_share(args):
-    url = get_remote_url(args.slug)
-    print(f"Share link for {args.slug}: {url}")
+    slug = args.slug
+    if not slug:
+        slug = _select_project(args)
+    if not slug:
+        return
 
+    # Check if synced
+    db = Database(args.db)
+    with sqlite3.connect(db.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT last_synced_at FROM videos WHERE slug = ?", (slug,))
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            print(f"Error: Project '{slug}' has not been pushed to the grid yet.")
+            print(f"Run 'tube2txt push {slug}' first.")
+            return
 
-def cmd_url(args):
+    url = get_remote_url(slug)
+    print(f"Share link for {slug}: {url}")
+
+def cmd_add(args):
     # Manual Clipping
     if args.clip and args.video_file:
         clip_match = re.match(r'^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)-(\d{2}:\d{2}:\d{2}(?:\.\d+)?)$', args.clip)
@@ -635,8 +700,9 @@ def cmd_url(args):
             url = slug
             slug = "default"
         else:
-            print("Error: Missing URL.")
-            sys.exit(1)
+            print("No URL provided. Entering interactive mode...")
+            cmd_interactive(args)
+            return
 
     project_path = os.path.join(args.projects_dir, slug)
     # Auto-enable AI if GEMINI_API_KEY is set, even without --ai flag
@@ -663,51 +729,42 @@ def get_parser():
     common_parser.add_argument("--db", default="tube2txt.db", help="Path to SQLite DB")
     common_parser.add_argument("--projects-dir", default="projects", help="Directory for output")
 
-    # Command: url (legacy processing)
-    parser_url = subparsers.add_parser("url", parents=[common_parser], help="Process a YouTube URL")
-    parser_url.add_argument("slug_or_url", nargs="?", help="Project slug or YouTube URL")
-    parser_url.add_argument("url", nargs="?", help="YouTube video URL (if slug provided)")
-    parser_url.add_argument("--vtt", help="Path to existing VTT file (skips download)")
-    parser_url.add_argument("--ai", action="store_true", help="Run AI generation")
-    parser_url.add_argument("--mode", default="outline", help="Requested AI mode")
-    parser_url.add_argument("--parallel", type=int, default=4, help="Parallel image extraction")
-    parser_url.add_argument("--clip", help="Manual clip: START-END")
-    parser_url.add_argument("--video-file", help="Video file for manual clipping")
-    
-    # Command: process (alias to url)
-    parser_process = subparsers.add_parser("process", parents=[common_parser], help="Alias for 'url'")
-    parser_process.add_argument("slug_or_url", nargs="?", help="Project slug or YouTube URL")
-    parser_process.add_argument("url", nargs="?", help="YouTube video URL (if slug provided)")
-    parser_process.add_argument("--ai", action="store_true", help="Run AI generation")
-    parser_process.add_argument("--mode", default="outline", help="Requested AI mode")
+    # Command: add
+    parser_add = subparsers.add_parser("add", aliases=["url", "process"], parents=[common_parser], help="Process a YouTube URL")
+    parser_add.add_argument("url", nargs="?", help="YouTube URL or video ID")
+    parser_add.add_argument("slug_or_url", nargs="?", help="Project slug (optional)")
+    parser_add.add_argument("--ai", action="store_true", help="Enable AI processing")
+    parser_add.add_argument("--mode", default="outline", choices=["outline", "notes", "technical", "recipe"], help="AI analysis mode")
+    parser_add.add_argument("--parallel", type=int, default=4, help="Parallel image extraction threads")
+    parser_add.add_argument("--clip", help="Extract a clip (format HH:MM:SS-HH:MM:SS)")
+    parser_add.add_argument("--video-file", help="Local video file for clipping")
 
-    # Command: list
-    subparsers.add_parser("list", parents=[common_parser], help="List processed videos")
+    # Command: ls
+    subparsers.add_parser("ls", aliases=["list"], parents=[common_parser], help="List local projects")
 
-    # Command: delete
-    parser_delete = subparsers.add_parser("delete", parents=[common_parser], help="Delete a processed video")
-    parser_delete.add_argument("slug", help="Project slug to delete")
+    # Command: rm
+    parser_rm = subparsers.add_parser("rm", aliases=["delete"], parents=[common_parser], help="Remove a local project")
+    parser_rm.add_argument("slug", nargs="?", help="Project slug to remove")
 
     # Command: archive
     parser_archive = subparsers.add_parser("archive", parents=[common_parser], help="Archive a processed video")
-    parser_archive.add_argument("slug", help="Project slug to archive")
+    parser_archive.add_argument("slug", nargs="?", help="Project slug to archive")
 
-    # Command: setup
-    subparsers.add_parser("setup", parents=[common_parser], help="Setup remote integration")
+    # Command: push
+    parser_push = subparsers.add_parser("push", aliases=["sync"], parents=[common_parser], help="Push local metadata to remote")
+    parser_push.add_argument("slug", nargs="?", help="Project slug to push")
+
+    # Command: share
+    parser_share = subparsers.add_parser("share", parents=[common_parser], help="Generate shareable remote URL")
+    parser_share.add_argument("slug", nargs="?", help="Project slug to share")
+
+    # Command: config
+    subparsers.add_parser("config", aliases=["setup"], parents=[common_parser], help="Configure remote integration")
 
     # Command: remote
     subparsers.add_parser("remote", parents=[common_parser], help="Check remote status")
 
-    # Command: sync
-    parser_sync = subparsers.add_parser("sync", parents=[common_parser], help="Sync local metadata to remote")
-    parser_sync.add_argument("slug", help="Project slug to sync")
-
-    # Command: share
-    parser_share = subparsers.add_parser("share", parents=[common_parser], help="Generate shareable remote URL")
-    parser_share.add_argument("slug", help="Project slug to share")
-
     return parser
-
 
 def cmd_interactive(args):
     print(f"{CLI_COLOR_CYAN}--- Tube2Txt Interactive Forge ---{CLI_COLOR_RESET}")
@@ -737,39 +794,39 @@ def cmd_interactive(args):
             self.video_file = None
 
     interactive_args = DummyArgs(url, slug, ai_flag, args.db, args.projects_dir, "outline", 4)
-    cmd_url(interactive_args)
+    cmd_add(interactive_args)
 
 def main():
     parser = get_parser()
     
     # If no arguments, enter interactive mode
     if len(sys.argv) == 1:
-        args = parser.parse_args(["list"]) # Just to get default DB paths etc
+        args = parser.parse_args(["ls"]) # Just to get default DB paths etc
         cmd_interactive(args)
         return
 
     # If the first argument is not a known command and not a help flag, 
-    # assume it's the 'url' command (legacy support)
-    commands = ["url", "process", "list", "delete", "archive", "setup", "remote", "sync", "share"]
+    # assume it's the 'add' command (legacy support)
+    commands = ["add", "url", "process", "ls", "list", "rm", "delete", "archive", "push", "sync", "share", "config", "setup", "remote"]
     if sys.argv[1] not in commands and sys.argv[1] not in ["-h", "--help"]:
-        sys.argv.insert(1, "url")
+        sys.argv.insert(1, "add")
 
     args = parser.parse_args()
 
-    if args.command == "url" or args.command == "process":
-        cmd_url(args)
-    elif args.command == "list":
-        cmd_list(args)
-    elif args.command == "delete":
-        cmd_delete(args)
+    if args.command in ["add", "url", "process"]:
+        cmd_add(args)
+    elif args.command in ["ls", "list"]:
+        cmd_ls(args)
+    elif args.command in ["rm", "delete"]:
+        cmd_rm(args)
     elif args.command == "archive":
         cmd_archive(args)
-    elif args.command == "setup":
-        cmd_setup(args)
+    elif args.command in ["config", "setup"]:
+        cmd_config(args)
     elif args.command == "remote":
         cmd_remote(args)
-    elif args.command == "sync":
-        cmd_sync(args)
+    elif args.command in ["push", "sync"]:
+        cmd_push(args)
     elif args.command == "share":
         cmd_share(args)
     else:
