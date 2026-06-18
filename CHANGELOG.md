@@ -4,6 +4,15 @@ All notable changes to Tube2Txt are documented here.
 
 ---
 
+## [3.2.2] — 2026-06-18
+
+### Fixed
+- **CLI Dependency Resolution** — Updated `tube2txt.sh` to use `uv run` to ensure project-local binaries are used, resolving conflicts with global installations.
+- **AI Reliability** — Added exponential backoff and retry logic for Gemini API server errors.
+- **CLI Argument Handling** — Improved slug/URL detection and added intelligent argument swapping for the `add` command.
+
+---
+
 ## [3.2.1] — 2026-03-28
 
 ### Fixed

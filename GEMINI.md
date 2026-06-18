@@ -60,7 +60,9 @@ This file serves as the system rules, context, and orientation guide for any AI 
 # Start the Intelligence Hub (Web Dashboard)
 uv run tube2txt-hub
 
-# Process a video via CLI
+# Process a video via CLI (Interactive or Direct)
+./tube2txt.sh "URL" --ai
+# or
 uv run tube2txt "URL" --ai
 
 # Run tests

@@ -222,11 +222,23 @@ I have a transcript of a YouTube video. {system_prompt}
 Transcript:
 {full_transcript}
 """
-        response = self.client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt
+        from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+        from google.genai import errors
+
+        @retry(
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=1, min=2, max=30),
+            retry=retry_if_exception_type(errors.ServerError),
+            reraise=True
         )
-        return response.text
+        def _generate():
+            response = self.client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
+            return response.text
+            
+        return _generate()
 
     def determine_best_mode(self, outline):
         prompt = f"""
@@ -694,14 +706,25 @@ def cmd_add(args):
     # Resolve URL and slug
     url = args.url
     slug = args.slug_or_url
+    
+    # Intelligent argument swapping: if url is likely a slug and slug is likely a URL
+    is_url_id = get_video_id(url) is not None if url else False
+    is_slug_id = get_video_id(slug) is not None if slug else False
+    
+    if url and not is_url_id and is_slug_id:
+        url, slug = slug, url
+        
     if not url:
-        if slug and (slug.startswith("http") or len(slug) == 11):
+        if slug and get_video_id(slug):
             url = slug
             slug = "default"
         else:
             print("No URL provided. Entering interactive mode...")
             cmd_interactive(args)
             return
+
+    if not slug:
+        slug = "default"
 
     project_path = os.path.join(args.projects_dir, slug)
     # Auto-enable AI if GEMINI_API_KEY is set, even without --ai flag
